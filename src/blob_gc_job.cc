@@ -289,7 +289,7 @@ Status BlobGCJob::DoRunGC() {
     }
 
     bool discardable = false;
-    {
+    if (!db_options_.gc_all_valid) {
       TitanStopWatch gc_read_lsm(env_, cfh->GetID(), stats_, TitanInternalStats::GC_READ_LSM_MICROS);
       s = DiscardEntry(gc_iter->key(), blob_index, &discardable);
     }
@@ -531,7 +531,9 @@ Status BlobGCJob::RewriteValidKeyToLSM() {
       s = Status::ShutdownInProgress();
       break;
     }
-    s = db_impl->WriteWithCallback(wo, &write_batch.first, &write_batch.second);
+    if(db_options_.gc_write_back_lsm) {
+      s = db_impl->WriteWithCallback(wo, &write_batch.first, &write_batch.second);
+    }
     if (s.ok()) {
       // count written bytes for new blob index.
       metrics_.blob_db_bytes_written += write_batch.first.GetDataSize();
