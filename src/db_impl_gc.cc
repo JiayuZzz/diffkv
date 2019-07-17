@@ -4,6 +4,8 @@
 #include "blob_gc_job.h"
 #include "blob_gc_picker.h"
 
+extern uint64_t total_gc_time;
+
 namespace rocksdb {
 namespace titandb {
 
@@ -59,6 +61,7 @@ void TitanDBImpl::BackgroundCallGC() {
 }
 
 Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer) {
+  uint64_t startMicros = env_->NowMicros();
   mutex_.AssertHeld();
   StopWatch gc_sw(env_, statistics(stats_.get()), BLOB_DB_GC_MICROS);
 
@@ -111,7 +114,7 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer) {
     ROCKS_LOG_WARN(db_options_.info_log, "Titan GC error: %s",
                    s.ToString().c_str());
   }
-
+  total_gc_time += env_->NowMicros() - startMicros;
   return s;
 }
 

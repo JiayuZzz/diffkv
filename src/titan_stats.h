@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <iostream>
 
 namespace rocksdb {
 namespace titandb {
@@ -100,24 +101,6 @@ class TitanStats {
   }
 };
 
-class TitanStopWatch {
-public:
-  TitanStopWatch(Env* env, uint32_t cf_id, TitanStats* stats, TitanInternalStats::StatsType type)
-  :env_(env), cf_id_(cf_id), start_(env_->NowMicros()), stats_(stats), type_(type){}
-  ~TitanStopWatch(){
-    if(stats_) {
-      stats_->internal_stats(cf_id_)->AddStats(type_, env_->NowMicros() - start_);
-    }
-  }
-
-private:
-  Env* env_;
-  uint32_t cf_id_;
-  uint64_t start_;
-  TitanStats* stats_;
-  TitanInternalStats::StatsType type_;
-};
-
 // Utility functions
 inline Statistics* statistics(TitanStats* stats) {
   return (stats) ? stats->statistics() : nullptr;
@@ -173,6 +156,24 @@ inline void SubStats(TitanStats* stats, uint32_t cf_id,
     }
   }
 }
+
+class TitanStopWatch {
+public:
+  TitanStopWatch(Env* env, uint32_t cf_id, TitanStats* stats, TitanInternalStats::StatsType type)
+      :env_(env), cf_id_(cf_id), start_(env_->NowMicros()), stats_(stats), type_(type){
+  }
+  ~TitanStopWatch(){
+    if(stats_)
+      AddStats(stats_, cf_id_, type_, env_->NowMicros() - start_);
+  }
+
+private:
+  Env* env_;
+  uint32_t cf_id_;
+  uint64_t start_;
+  TitanStats* stats_;
+  TitanInternalStats::StatsType type_;
+};
 
 }  // namespace titandb
 }  // namespace rocksdb

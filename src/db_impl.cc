@@ -16,6 +16,14 @@
 #include "db_iter.h"
 #include "table_factory.h"
 #include "titan_build_version.h"
+#include <iostream>
+
+uint64_t callback_time = 0;
+uint64_t gc_write_lsm_time = 0;
+uint64_t gc_read_lsm_time = 0;
+uint64_t total_gc_time = 0;
+uint64_t gc_relocated = 0;
+uint64_t gc_overwritten = 0;
 
 namespace rocksdb {
 namespace titandb {
@@ -134,7 +142,15 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
   blob_manager_.reset(new FileManager(this));
 }
 
-TitanDBImpl::~TitanDBImpl() { Close(); }
+TitanDBImpl::~TitanDBImpl() {
+  std::cout<<"call back gc time:"<<callback_time<<std::endl;
+  std::cout<<"read lsm time:"<<gc_read_lsm_time<<std::endl;
+  std::cout<<"write lsm time:"<<gc_write_lsm_time<<std::endl;
+  std::cout<<"total gc time:"<<total_gc_time<<std::endl;
+  std::cout<<"gc overwritten bytes:"<<gc_overwritten<<std::endl;
+  std::cout<<"gc relocated bytes:"<<gc_relocated<<std::endl;
+  Close();
+}
 
 void TitanDBImpl::StartBackgroundTasks() {
   if (!thread_purge_obsolete_) {
@@ -670,6 +686,7 @@ TitanDBOptions TitanDBImpl::GetTitanDBOptions() const {
 bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
                               const Slice& property, std::string* value) {
   assert(column_family != nullptr);
+  value->clear();
   bool s = false;
   if (stats_.get() != nullptr) {
     auto stats = stats_->internal_stats(column_family->GetID());
@@ -677,7 +694,7 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
       s = stats->GetStringProperty(property, value);
     }
   }
-  if (s) {
+  if (s&&(!value->empty())) {
     return s;
   } else {
     return db_impl_->GetProperty(column_family, property, value);
