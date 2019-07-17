@@ -23,6 +23,11 @@ class TitanInternalStats {
     LIVE_BLOB_FILE_SIZE,
     OBSOLETE_BLOB_FILE_SIZE,
     INTERNAL_STATS_ENUM_MAX,
+    GC_READ_LSM_MICROS,
+    GC_CALLBACK_MICROS,
+    GC_WRITE_LSM_MICROS,
+    GC_READ_BLOB_FILE_MICROS,
+    GC_WRITE_BLOB_FILE_MICROS,
   };
   void Clear() {
     for (int i = 0; i < INTERNAL_STATS_ENUM_MAX; i++) {
@@ -93,6 +98,24 @@ class TitanStats {
       TitanCFOptions& opts) {
     return std::make_shared<TitanInternalStats>();
   }
+};
+
+class TitanStopWatch {
+public:
+  TitanStopWatch(Env* env, uint32_t cf_id, TitanStats* stats, TitanInternalStats::StatsType type)
+  :env_(env), cf_id_(cf_id), start_(env_->NowMicros()), stats_(stats), type_(type){}
+  ~TitanStopWatch(){
+    if(stats_) {
+      stats_->internal_stats(cf_id_)->AddStats(type_, env_->NowMicros() - start_);
+    }
+  }
+
+private:
+  Env* env_;
+  uint32_t cf_id_;
+  uint64_t start_;
+  TitanStats* stats_;
+  TitanInternalStats::StatsType type_;
 };
 
 // Utility functions

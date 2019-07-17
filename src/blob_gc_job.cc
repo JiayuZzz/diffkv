@@ -14,14 +14,15 @@ namespace titandb {
 class BlobGCJob::GarbageCollectionWriteCallback : public WriteCallback {
  public:
   GarbageCollectionWriteCallback(ColumnFamilyHandle* cfh, std::string&& _key,
-                                 BlobIndex&& blob_index)
-      : cfh_(cfh), key_(std::move(_key)), blob_index_(blob_index) {
+                                 BlobIndex&& blob_index, Env* env, TitanStats* stats)
+      : cfh_(cfh), key_(std::move(_key)), blob_index_(blob_index), env_(env), stats_(stats) {
     assert(!key_.empty());
   }
 
   std::string value;
 
   virtual Status Callback(DB* db) override {
+    TitanStopWatch(env_, cfh_->GetID(), stats_, TitanInternalStats::GC_CALLBACK_MICROS);
     auto* db_impl = reinterpret_cast<DBImpl*>(db);
     PinnableSlice index_entry;
     bool is_blob_index;
@@ -69,6 +70,8 @@ class BlobGCJob::GarbageCollectionWriteCallback : public WriteCallback {
   std::string key_;
   BlobIndex blob_index_;
   uint64_t read_bytes_;
+  Env* env_;
+  TitanStats* stats_;
 };
 
 BlobGCJob::BlobGCJob(BlobGC* blob_gc, DB* db, port::Mutex* mutex,
@@ -286,7 +289,10 @@ Status BlobGCJob::DoRunGC() {
     }
 
     bool discardable = false;
-    s = DiscardEntry(gc_iter->key(), blob_index, &discardable);
+    {
+      TitanStopWatch gc_read_lsm(env_, cfh->GetID(), stats_, TitanInternalStats::GC_READ_LSM_MICROS);
+      s = DiscardEntry(gc_iter->key(), blob_index, &discardable);
+    }
     if (!s.ok()) {
       break;
     }
@@ -339,7 +345,7 @@ Status BlobGCJob::DoRunGC() {
 
     // Store WriteBatch for rewriting new Key-Index pairs to LSM
     GarbageCollectionWriteCallback callback(cfh, blob_record.key.ToString(),
-                                            std::move(blob_index));
+                                            std::move(blob_index), env_, stats_);
     callback.value = index_entry;
     rewrite_batches_.emplace_back(
         std::make_pair(WriteBatch(), std::move(callback)));
@@ -430,7 +436,10 @@ Status BlobGCJob::Finish() {
     mutex_->Unlock();
     s = InstallOutputBlobFiles();
     if (s.ok()) {
-      s = RewriteValidKeyToLSM();
+      {
+        TitanStopWatch gc_write_lsm(env_, blob_gc_->column_family_handle()->GetID(), stats_, TitanInternalStats::GC_WRITE_LSM_MICROS);
+        s = RewriteValidKeyToLSM();
+      }
       if (!s.ok()) {
         ROCKS_LOG_ERROR(db_options_.info_log,
                         "[%s] GC job failed to rewrite keys to LSM: %s",
