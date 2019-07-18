@@ -24,6 +24,7 @@ uint64_t gc_read_lsm_time = 0;
 uint64_t total_gc_time = 0;
 uint64_t gc_relocated = 0;
 uint64_t gc_overwritten = 0;
+uint64_t gc_rewrite_to_lsm_time = 0;
 
 namespace rocksdb {
 namespace titandb {
@@ -145,7 +146,8 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
 TitanDBImpl::~TitanDBImpl() {
   std::cout<<"call back gc time:"<<callback_time<<std::endl;
   std::cout<<"read lsm time:"<<gc_read_lsm_time<<std::endl;
-  std::cout<<"write lsm time:"<<gc_write_lsm_time<<std::endl;
+  std::cout<<"gc call rewrite to lsm time"<<gc_rewrite_to_lsm_time<<std::endl;
+  std::cout<<"gc write lsm time:"<<gc_write_lsm_time<<std::endl;
   std::cout<<"total gc time:"<<total_gc_time<<std::endl;
   std::cout<<"gc overwritten bytes:"<<gc_overwritten<<std::endl;
   std::cout<<"gc relocated bytes:"<<gc_relocated<<std::endl;

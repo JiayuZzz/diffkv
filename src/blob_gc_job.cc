@@ -12,6 +12,7 @@ extern uint64_t gc_read_lsm_time;
 extern uint64_t gc_write_lsm_time;
 extern uint64_t gc_relocated;
 extern uint64_t gc_overwritten;
+extern uint64_t gc_rewrite_to_lsm_time;
 
 namespace rocksdb {
 namespace titandb {
@@ -454,7 +455,7 @@ Status BlobGCJob::Finish() {
         uint64_t startMicros = env_->NowMicros();
 //        TitanStopWatch gc_write_lsm(env_, blob_gc_->column_family_handle()->GetID(), stats_, TitanInternalStats::GC_WRITE_LSM_MICROS);
         s = RewriteValidKeyToLSM();
-        gc_write_lsm_time += env_->NowMicros()-startMicros;
+        gc_rewrite_to_lsm_time += (env_->NowMicros()-startMicros);
       }
       if (!s.ok()) {
         ROCKS_LOG_ERROR(db_options_.info_log,
@@ -547,7 +548,9 @@ Status BlobGCJob::RewriteValidKeyToLSM() {
       s = Status::ShutdownInProgress();
       break;
     }
+    uint64_t startMicros = env_->NowMicros();
     s = db_impl->WriteWithCallback(wo, &write_batch.first, &write_batch.second);
+    gc_write_lsm_time += (env_->NowMicros() - startMicros);
     if (s.ok()) {
       // count written bytes for new blob index.
       metrics_.blob_db_bytes_written += write_batch.first.GetDataSize();
