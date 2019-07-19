@@ -170,10 +170,8 @@ public:
   }
   ~TitanStopWatch(){
     if(type_>=MAX) return;
-    auto it = stats_.find(type_);
-    if(it!=stats_.end()) {
-      uint64_t tmp = it->second.load();
-      it->second.store(tmp+env_->NowMicros()-start_);
+    if(stats_.find(type_)!=stats_.end()) {
+      stats_[type_]+=env_->NowMicros()-start_;
     } else {
       stats_[type_]=env_->NowMicros()-start_;
     }

@@ -34,7 +34,8 @@ DEFINE_string(dir,
               "/tmp/vtable_proto", "");
 DEFINE_uint64(num_keys,
               10000000, "");
-DEFINE_uint32(num_keys_scan, 100000, "");
+DEFINE_uint64(scan_length, 100000, "");
+DEFINE_uint64(scan_times, 100, "");
 DEFINE_double(ordered_keys_ratio,
               0.0, "");
 DEFINE_uint64(value_size,
@@ -52,14 +53,14 @@ DEFINE_uint64(prefetch_size,
 DEFINE_bool(cleanup,
             true, "");
 DEFINE_bool(readahead,
-            false,"");
+            false, "");
 
 Slice GenerateKey(uint64_t id, std::string *dst) {
   PutFixed64(dst, id);
   return Slice(*dst);
 }
 
-Slice GenerateValue(Random &rnd, std::string *dst) {
+Slice GenerateValue(Random64 &rnd, std::string *dst) {
   dst->resize(FLAGS_value_size);
   for (uint64_t i = 0; i < FLAGS_value_size; i++) {
     (*dst)[i] = static_cast<char>(' ' + rnd.Uniform(95));
@@ -68,7 +69,7 @@ Slice GenerateValue(Random &rnd, std::string *dst) {
 }
 
 Status GenerateFile(
-    Env *env, std::string name, Random &rnd,
+    Env *env, std::string name, Random64 &rnd,
     std::vector<uint64_t> &keys, uint64_t begin, uint64_t end,
     std::vector<BlobHandle> *index,
     std::unique_ptr<RandomAccessFileReader> *file_reader) {
@@ -132,17 +133,16 @@ Status GenerateFile(
   return s;
 }
 
-
 void DropPagecache() {
   int pc = open("/proc/sys/vm/drop_caches", O_WRONLY);
   int n = write(pc, "3", 1);
-  if(n!=1) {
-    printf("drop page cache error: %d, need sudo\n",n);
+  if (n != 1) {
+    printf("drop page cache error: %d, need sudo\n", n);
   }
   close(pc);
   sync();
 
-  sleep(10);
+  sleep(5);
 }
 
 class MyRandomAccessFile : public PosixRandomAccessFile {
@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
   if (!s.ok()) {
     printf("Create directory error: %s\n", s.ToString().c_str());
   }
-  Random rnd(static_cast<uint32_t>(seed));
+  Random64 rnd(static_cast<uint64_t>(seed));
   std::unique_ptr<RandomAccessFileReader> moreOrderedReader;
   s = GenerateFile(
       env, "moreOrdered", rnd, keys, 0, num_keys, &index, &moreOrderedReader);
@@ -191,74 +191,61 @@ int main(int argc, char **argv) {
     printf("Failed to generate moreordered blob file: %s\n", s.ToString().c_str());
     return 0;
   }
-//  std::unique_ptr<RandomAccessFileReader> lessOrderedReader;
-//  s = GenerateFile(
-//      env, "lessOrdered", rnd, keys, num_keys * 0.9, num_keys * 0.99, &index, &lessOrderedReader);
-//  if (!s.ok()) {
-//    printf("Failed to generate lessordered blob file: %s\n", s.ToString().c_str());
-//    return 0;
-//  }
-//  std::unique_ptr<RandomAccessFileReader> unorderedReader;
-//  s = GenerateFile(
-//      env, "unOrdered", rnd, keys, num_keys * 0.99, num_keys, &index, &lessOrderedReader);
-//  if (!s.ok()) {
-//    printf("Failed to generate unordered blob file: %s\n", s.ToString().c_str());
-//    return 0;
-//  }
 
   unordered_set<uint64_t> prefetched;
   int fd = reinterpret_cast<MyRandomAccessFile *>(moreOrderedReader->file())->GetFd();
   char buffer[static_cast<size_t>(FLAGS_value_size + 100)];
-  uint32_t start = rnd.Uniform(num_keys-FLAGS_num_keys_scan), j=start;
-  // clear page cache
   DropPagecache();
   uint64_t start_time = env->NowMicros();
-  // pre fectch 32 values
-  if(FLAGS_readahead) {
-    for (; j < start + 32; j++) {
-      uint64_t blockStart = index[j].offset / 4096;
-      if (prefetched.find(blockStart) == prefetched.end()) {
-        readahead(fd, index[j].offset, index[j].size);
-        prefetched.insert(blockStart);
+  for (uint64_t k = 0; k < FLAGS_scan_times; k++) {
+    uint64_t start = rnd.Uniform(num_keys - FLAGS_scan_length), j = start;
+    if (FLAGS_readahead) {
+      // pre fectch 32 values
+      for (; j < start + 32; j++) {
+        uint64_t blockStart = index[j].offset / 4096;
+        if (prefetched.find(blockStart) == prefetched.end()) {
+          readahead(fd, index[j].offset, index[j].size);
+          prefetched.insert(blockStart);
+        }
       }
     }
-  }
 
-  for (uint64_t i = start; i < start+FLAGS_num_keys_scan; i++) {
-    BlobHandle handle = index[i];
-    BlobRecord record;
-    Slice blob;
-    OwnedSlice owned_buffer;
+    for (uint64_t i = start; i < start + FLAGS_scan_length; i++) {
+      BlobHandle handle = index[i];
+      BlobRecord record;
+      Slice blob;
+      OwnedSlice owned_buffer;
 
-    s = moreOrderedReader->Read(handle.offset, handle.size, &blob, buffer);
-    if (!s.ok()) {
-      printf("failed to get value:%s\n", s.ToString().c_str());
-      return 0;
-    }
-    if(FLAGS_readahead) {
-      uint64_t blockStart = index[j].offset / 4096;
-      if (prefetched.find(blockStart) == prefetched.end()) {
-        readahead(fd, index[j].offset, index[j].size);
-        prefetched.insert(blockStart);
+      s = moreOrderedReader->Read(handle.offset, handle.size, &blob, buffer);
+      if (!s.ok()) {
+        printf("failed to get value:%s\n", s.ToString().c_str());
+        return 0;
       }
-      j++;
-    }
+      if (FLAGS_readahead) {
+        uint64_t blockStart = index[j].offset / 4096;
+        if (prefetched.find(blockStart) == prefetched.end()) {
+          readahead(fd, index[j].offset, index[j].size);
+          prefetched.insert(blockStart);
+        }
+        j++;
+      }
 
-//    BlobDecoder decoder;
-//    s = decoder.DecodeHeader(&blob);
-//    if (s.ok()) {
-//      s = decoder.DecodeRecord(&blob, &record, &owned_buffer);
-//    }
-//    if (!s.ok()) {
-//      printf("failed to decode key %lu, %s\n", i, s.ToString().c_str());
-//      return 0;
-//    }
-//    std::string key_str;
-//    Slice key = GenerateKey(i, &key_str);
-//    if (key != record.key) {
-//      printf("key mismatch at %lu\n", i);
-//      return 0;
-//    }
+      BlobDecoder decoder;
+      s = decoder.DecodeHeader(&blob);
+      if (s.ok()) {
+        s = decoder.DecodeRecord(&blob, &record, &owned_buffer);
+      }
+      if (!s.ok()) {
+        printf("failed to decode key %lu, %s\n", i, s.ToString().c_str());
+        return 0;
+      }
+      std::string key_str;
+      Slice key = GenerateKey(i, &key_str);
+      if (key != record.key) {
+        printf("key mismatch at %lu\n", i);
+        return 0;
+      }
+    }
   }
   uint64_t end_time = env->NowMicros();
   printf("Elapsed time (us): %lu\n", end_time - start_time);
