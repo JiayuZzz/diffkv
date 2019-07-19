@@ -31,6 +31,10 @@ struct TitanDBOptions : public DBOptions {
   // Default: 10
   uint32_t purge_obsolete_files_period{10};  // 10s
 
+  bool gc_read_lsm{true};
+  bool gc_write_back_key{true};
+  bool gc_write_back_val{true};
+
 //  bool gc_write_back_lsm{true};
 //  bool gc_all_valid{false};
 

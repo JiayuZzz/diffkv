@@ -24,11 +24,6 @@ class TitanInternalStats {
     LIVE_BLOB_FILE_SIZE,
     OBSOLETE_BLOB_FILE_SIZE,
     INTERNAL_STATS_ENUM_MAX,
-    GC_READ_LSM_MICROS,
-    GC_CALLBACK_MICROS,
-    GC_WRITE_LSM_MICROS,
-    GC_READ_BLOB_FILE_MICROS,
-    GC_WRITE_BLOB_FILE_MICROS,
   };
   void Clear() {
     for (int i = 0; i < INTERNAL_STATS_ENUM_MAX; i++) {
@@ -157,22 +152,45 @@ inline void SubStats(TitanStats* stats, uint32_t cf_id,
   }
 }
 
+static std::unordered_map<uint16_t , std::atomic<uint64_t >> stats_;
+
 class TitanStopWatch {
 public:
-  TitanStopWatch(Env* env, uint32_t cf_id, TitanStats* stats, TitanInternalStats::StatsType type)
-      :env_(env), cf_id_(cf_id), start_(env_->NowMicros()), stats_(stats), type_(type){
+  enum TimeStats {
+    GC_READ_LSM,
+    GC_CALLBACK,
+    GC_WRITE_LSM,
+    GC_REWRITE_LSM_CALL,
+    TOTAL_GC_TIME,
+    MAX,
+  };
+
+  TitanStopWatch(Env* env, TimeStats type)
+      :env_(env), start_(env_->NowMicros()), type_(type){
   }
   ~TitanStopWatch(){
-    if(stats_)
-      AddStats(stats_, cf_id_, type_, env_->NowMicros() - start_);
+    if(type_>=MAX) return;
+    auto it = stats_.find(type_);
+    if(it!=stats_.end()) {
+      uint64_t tmp = it->second.load();
+      it->second.store(tmp+env_->NowMicros()-start_);
+    } else {
+      stats_[type_]=env_->NowMicros()-start_;
+    }
   }
+
+  static void PrintStats() {
+    std::cout<<"call back gc time:"<<stats_[GC_CALLBACK].load()<<std::endl;
+    std::cout<<"read lsm time:"<<stats_[GC_READ_LSM].load()<<std::endl;
+    std::cout<<"gc call rewrite to lsm time"<<stats_[GC_REWRITE_LSM_CALL].load()<<std::endl;
+    std::cout<<"gc write lsm time:"<<stats_[GC_WRITE_LSM].load()<<std::endl;
+    std::cout<<"total gc time:"<<stats_[TOTAL_GC_TIME].load()<<std::endl;
+  };
 
 private:
   Env* env_;
-  uint32_t cf_id_;
   uint64_t start_;
-  TitanStats* stats_;
-  TitanInternalStats::StatsType type_;
+  TimeStats type_;
 };
 
 }  // namespace titandb

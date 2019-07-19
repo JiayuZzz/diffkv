@@ -110,6 +110,15 @@ if (WITH_TITAN_TOOLS)
   add_definitions(-DGFLAGS)
 
   add_executable(titandb_stress tools/titandb_stress.cc)
+
+  add_executable(hashkv_proto tools/hashkv_proto.cc)
+  target_include_directories(hashkv_proto PRIVATE ${gflags_INCLUDE_DIR})
+  target_link_libraries(hashkv_proto ${TOOLS_LIBS})
+
+  add_executable(vtable_proto tools/vtable_proto.cc)
+  target_include_directories(vtable_proto PRIVATE ${gflags_INCLUDE_DIR})
+  target_link_libraries(vtable_proto ${TOOLS_LIBS})
+
   target_include_directories(titandb_stress PRIVATE ${gflags_INCLUDE_DIR})
   target_link_libraries(titandb_stress ${TOOLS_LIBS})
 

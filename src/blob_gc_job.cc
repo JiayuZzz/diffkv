@@ -7,12 +7,7 @@
 #include <inttypes.h>
 #include <iostream>
 
-extern uint64_t callback_time;
-extern uint64_t gc_read_lsm_time;
-extern uint64_t gc_write_lsm_time;
-extern uint64_t gc_relocated;
-extern uint64_t gc_overwritten;
-extern uint64_t gc_rewrite_to_lsm_time;
+extern std::atomic<uint64_t > gc_relocated;
 
 namespace rocksdb {
 namespace titandb {
@@ -22,15 +17,15 @@ namespace titandb {
 class BlobGCJob::GarbageCollectionWriteCallback : public WriteCallback {
  public:
   GarbageCollectionWriteCallback(ColumnFamilyHandle* cfh, std::string&& _key,
-                                 BlobIndex&& blob_index, Env* env, TitanStats* stats)
-      : cfh_(cfh), key_(std::move(_key)), blob_index_(blob_index), env_(env), stats_(stats) {
+                                 BlobIndex&& blob_index, Env* env)
+      : cfh_(cfh), key_(std::move(_key)), blob_index_(blob_index), env_(env) {
     assert(!key_.empty());
   }
 
   std::string value;
 
   virtual Status Callback(DB* db) override {
-    uint64_t start_micros = env_->NowMicros();
+    TitanStopWatch cb(env_, TitanStopWatch::GC_CALLBACK);
     //TitanStopWatch(env_, cfh_->GetID(), stats_, TitanInternalStats::GC_CALLBACK_MICROS);
     auto* db_impl = reinterpret_cast<DBImpl*>(db);
     PinnableSlice index_entry;
@@ -39,7 +34,6 @@ class BlobGCJob::GarbageCollectionWriteCallback : public WriteCallback {
                               nullptr /*value_found*/,
                               nullptr /*read_callback*/, &is_blob_index);
     if (!s.ok() && !s.IsNotFound()) {
-      callback_time += env_->NowMicros() - start_micros;
       return s;
     }
     read_bytes_ = key_.size() + index_entry.size();
@@ -55,7 +49,6 @@ class BlobGCJob::GarbageCollectionWriteCallback : public WriteCallback {
       BlobIndex other_blob_index;
       s = other_blob_index.DecodeFrom(&index_entry);
       if (!s.ok()) {
-        callback_time += env_->NowMicros() - start_micros;
         return s;
       }
 
@@ -63,7 +56,6 @@ class BlobGCJob::GarbageCollectionWriteCallback : public WriteCallback {
         s = Status::Busy("key overwritten with other blob");
       }
     }
-    callback_time += env_->NowMicros() - start_micros;
     return s;
   }
 
@@ -82,7 +74,6 @@ class BlobGCJob::GarbageCollectionWriteCallback : public WriteCallback {
   BlobIndex blob_index_;
   uint64_t read_bytes_;
   Env* env_;
-  TitanStats* stats_;
 };
 
 BlobGCJob::BlobGCJob(BlobGC* blob_gc, DB* db, port::Mutex* mutex,
@@ -123,8 +114,6 @@ BlobGCJob::~BlobGCJob() {
   RecordTick(stats_, BLOB_DB_GC_NUM_NEW_FILES,
              metrics_.blob_db_gc_num_new_files);
   RecordTick(stats_, BLOB_DB_GC_NUM_FILES, metrics_.blob_db_gc_num_files);
-  gc_overwritten = metrics_.blob_db_gc_bytes_overwritten;
-  gc_relocated = metrics_.blob_db_gc_bytes_relocated;
 }
 
 Status BlobGCJob::Prepare() { return Status::OK(); }
@@ -302,16 +291,16 @@ Status BlobGCJob::DoRunGC() {
     }
 
     bool discardable = false;
-    {
-      uint64_t startMicros = env_->NowMicros();
-//      TitanStopWatch gc_read_lsm(env_, cfh->GetID(), stats_, TitanInternalStats::GC_READ_LSM_MICROS);
+    assert(!db_options_.gc_read_lsm);
+    if(db_options_.gc_read_lsm) {
+      TitanStopWatch rlsm(env_, TitanStopWatch::GC_READ_LSM);
       s = DiscardEntry(gc_iter->key(), blob_index, &discardable);
-      gc_read_lsm_time += env_->NowMicros()-startMicros;
     }
     if (!s.ok()) {
       break;
     }
     if (discardable) {
+      std::cerr<<"discard entry\n";
       metrics_.blob_db_gc_num_keys_overwritten++;
       metrics_.blob_db_gc_bytes_overwritten += blob_index.blob_handle.size;
       continue;
@@ -351,6 +340,7 @@ Status BlobGCJob::DoRunGC() {
     // blob index's size is counted in `RewriteValidKeyToLSM`
     metrics_.blob_db_bytes_written +=
         blob_record.key.size() + blob_record.value.size();
+    gc_relocated += blob_record.key.size() + blob_record.value.size();
 
     BlobIndex new_blob_index;
     new_blob_index.file_number = blob_file_handle->GetNumber();
@@ -360,7 +350,7 @@ Status BlobGCJob::DoRunGC() {
 
     // Store WriteBatch for rewriting new Key-Index pairs to LSM
     GarbageCollectionWriteCallback callback(cfh, blob_record.key.ToString(),
-                                            std::move(blob_index), env_, stats_);
+                                            std::move(blob_index), env_);
     callback.value = index_entry;
     rewrite_batches_.emplace_back(
         std::make_pair(WriteBatch(), std::move(callback)));
@@ -452,10 +442,8 @@ Status BlobGCJob::Finish() {
     s = InstallOutputBlobFiles();
     if (s.ok()) {
       {
-        uint64_t startMicros = env_->NowMicros();
-//        TitanStopWatch gc_write_lsm(env_, blob_gc_->column_family_handle()->GetID(), stats_, TitanInternalStats::GC_WRITE_LSM_MICROS);
+        TitanStopWatch wlsmc(env_, TitanStopWatch::GC_REWRITE_LSM_CALL);
         s = RewriteValidKeyToLSM();
-        gc_rewrite_to_lsm_time += (env_->NowMicros()-startMicros);
       }
       if (!s.ok()) {
         ROCKS_LOG_ERROR(db_options_.info_log,
@@ -531,10 +519,10 @@ Status BlobGCJob::InstallOutputBlobFiles() {
   }
   return s;
 }
-
+/*
 Status BlobGCJob::RewriteValidKeyToLSM() {
   Status s;
-  auto* db_impl = reinterpret_cast<DBImpl*>(this->base_db_);
+//  auto* db_impl = reinterpret_cast<DBImpl*>(this->base_db_);
 
   WriteOptions wo;
   wo.low_pri = true;
@@ -549,7 +537,7 @@ Status BlobGCJob::RewriteValidKeyToLSM() {
       break;
     }
     uint64_t startMicros = env_->NowMicros();
-    s = db_impl->WriteWithCallback(wo, &write_batch.first, &write_batch.second);
+//    s = db_impl->WriteWithCallback(wo, &write_batch.first, &write_batch.second);
     gc_write_lsm_time += (env_->NowMicros() - startMicros);
     if (s.ok()) {
       // count written bytes for new blob index.
@@ -576,12 +564,63 @@ Status BlobGCJob::RewriteValidKeyToLSM() {
 
   if (s.ok()) {
     // Flush and sync WAL.
-    s = db_impl->FlushWAL(true /*sync*/);
+//    s = db_impl->FlushWAL(true);
   }
 
   return s;
 }
+ */
+Status BlobGCJob::RewriteValidKeyToLSM() {
+  Status s;
+  auto* db_impl = reinterpret_cast<DBImpl*>(this->base_db_);
 
+  WriteOptions wo;
+  wo.low_pri = true;
+  wo.ignore_missing_column_families = true;
+  for (auto& write_batch : this->rewrite_batches_) {
+    if (blob_gc_->GetColumnFamilyData()->IsDropped()) {
+      s = Status::Aborted("Column family drop");
+      break;
+    }
+    if (IsShutingDown()) {
+      s = Status::ShutdownInProgress();
+      break;
+    }
+    assert(db_options_.gc_write_back_key == false);
+    if (db_options_.gc_write_back_key) {
+      TitanStopWatch wlsm(env_, TitanStopWatch::GC_WRITE_LSM);
+      s = db_impl->WriteWithCallback(wo, &write_batch.first, &write_batch.second);
+    }
+    if (s.ok()) {
+      // count written bytes for new blob index.
+      metrics_.blob_db_bytes_written += write_batch.first.GetDataSize();
+      metrics_.blob_db_gc_num_keys_relocated++;
+      metrics_.blob_db_gc_bytes_relocated +=
+          write_batch.second.blob_record_size();
+      // Key is successfully written to LSM.
+    } else if (s.IsBusy()) {
+      metrics_.blob_db_gc_num_keys_overwritten++;
+      metrics_.blob_db_gc_bytes_overwritten +=
+          write_batch.second.blob_record_size();
+      // The key is overwritten in the meanwhile. Drop the blob record.
+    } else {
+      // We hit an error.
+      break;
+    }
+    // count read bytes in write callback
+    metrics_.blob_db_bytes_read += write_batch.second.read_bytes();
+  }
+  if (s.IsBusy()) {
+    s = Status::OK();
+  }
+
+  if (db_options_.gc_write_back_key&&s.ok()) {
+    // Flush and sync WAL.
+    s = db_impl->FlushWAL(true);
+  }
+
+  return s;
+}
 Status BlobGCJob::DeleteInputBlobFiles() {
   SequenceNumber obsolete_sequence = base_db_impl_->GetLatestSequenceNumber();
 

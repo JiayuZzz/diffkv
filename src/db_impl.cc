@@ -18,13 +18,7 @@
 #include "titan_build_version.h"
 #include <iostream>
 
-uint64_t callback_time = 0;
-uint64_t gc_write_lsm_time = 0;
-uint64_t gc_read_lsm_time = 0;
-uint64_t total_gc_time = 0;
-uint64_t gc_relocated = 0;
-uint64_t gc_overwritten = 0;
-uint64_t gc_rewrite_to_lsm_time = 0;
+std::atomic<uint64_t > gc_relocated{0};
 
 namespace rocksdb {
 namespace titandb {
@@ -144,13 +138,8 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
 }
 
 TitanDBImpl::~TitanDBImpl() {
-  std::cout<<"call back gc time:"<<callback_time<<std::endl;
-  std::cout<<"read lsm time:"<<gc_read_lsm_time<<std::endl;
-  std::cout<<"gc call rewrite to lsm time"<<gc_rewrite_to_lsm_time<<std::endl;
-  std::cout<<"gc write lsm time:"<<gc_write_lsm_time<<std::endl;
-  std::cout<<"total gc time:"<<total_gc_time<<std::endl;
-  std::cout<<"gc overwritten bytes:"<<gc_overwritten<<std::endl;
-  std::cout<<"gc relocated bytes:"<<gc_relocated<<std::endl;
+  TitanStopWatch::PrintStats();
+  std::cout<<"gc relocated bytes:"<<gc_relocated.load()/1048576<<"MB"<<std::endl;
   Close();
 }
 
