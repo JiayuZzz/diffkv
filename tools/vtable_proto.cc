@@ -22,7 +22,6 @@
 #include "blob_file_builder.h"
 #include "blob_file_reader.h"
 #include "blob_format.h"
-#include "unistd.h"
 #include "env/io_posix.h"
 
 using GFLAGS_NAMESPACE::ParseCommandLineFlags;
@@ -248,7 +247,8 @@ int main(int argc, char **argv) {
     }
   }
   uint64_t end_time = env->NowMicros();
-  printf("Elapsed time (us): %lu\n", end_time - start_time);
+  double throughput = (double)(FLAGS_value_size*FLAGS_scan_length*FLAGS_scan_times)/(1000000*(end_time-start_time));
+  printf("Elapsed time (us): %lu, throughput: %f MB/s\n", end_time - start_time, throughput);
   moreOrderedReader.reset();
   if (FLAGS_cleanup) {
     s = env->DeleteFile(FLAGS_dir + "/moreOrdered");

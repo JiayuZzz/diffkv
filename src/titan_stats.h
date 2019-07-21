@@ -152,8 +152,6 @@ inline void SubStats(TitanStats* stats, uint32_t cf_id,
   }
 }
 
-static std::unordered_map<uint16_t , std::atomic<uint64_t >> stats_;
-
 class TitanStopWatch {
 public:
   enum TimeStats {
@@ -189,6 +187,7 @@ private:
   Env* env_;
   uint64_t start_;
   TimeStats type_;
+  static std::unordered_map<TimeStats , std::atomic<uint64_t >> stats_;
 };
 
 }  // namespace titandb

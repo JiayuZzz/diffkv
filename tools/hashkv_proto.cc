@@ -19,6 +19,8 @@
 #include "blob_file_builder.h"
 #include "blob_file_reader.h"
 #include "blob_format.h"
+#include "env/io_posix.h"
+#include "unordered_set"
 
 using GFLAGS_NAMESPACE::ParseCommandLineFlags;
 
@@ -34,6 +36,8 @@ DEFINE_bool(prefetch_os_buffer, false, "");
 DEFINE_bool(prefetch, false, "");
 DEFINE_uint64(prefetch_size, 2 * 1024 * 1024, "");
 DEFINE_bool(cleanup, true, "");
+DEFINE_bool(readahead,
+            false, "");
 
 using namespace rocksdb;
 using namespace rocksdb::titandb;
@@ -128,6 +132,13 @@ void DropPagecache() {
   sleep(5);
 }
 
+class MyRandomAccessFile : public PosixRandomAccessFile {
+public:
+  int GetFd() {
+    return fd_;
+  }
+};
+
 int main(int argc, char **argv) {
   ParseCommandLineFlags(&argc, &argv, true);
 
@@ -171,6 +182,11 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  std::unordered_set<uint64_t> prefetched[2];
+  int fd[2];
+  fd[0] = reinterpret_cast<MyRandomAccessFile *>(ordered_reader->file())->GetFd();
+  fd[1] = reinterpret_cast<MyRandomAccessFile *>(unordered_reader->file())->GetFd();
+
   char buffer[static_cast<size_t>(FLAGS_value_size + 100)];
   char prefetch_buffer[static_cast<size_t>(FLAGS_prefetch_size)];
   size_t prefetch_offset = 0;
@@ -178,7 +194,19 @@ int main(int argc, char **argv) {
   DropPagecache();
   uint64_t start_time = env->NowMicros();
   for (uint64_t k = 0; k < FLAGS_scan_times; k++) {
-    uint64_t start = rnd.Uniform(num_keys - FLAGS_scan_length);
+    uint64_t start = rnd.Uniform(num_keys - FLAGS_scan_length), j=start;
+    if (FLAGS_readahead) {
+      // pre fectch 32 values
+      for (; j < start + 32; j++) {
+        int reader = is_ordered[j]?0:1;
+        uint64_t blockStart = index[j].offset / 4096;
+        if (prefetched[reader].find(blockStart) == prefetched[reader].end()) {
+          readahead(fd[reader], index[j].offset, index[j].size);
+          prefetched[reader].insert(blockStart);
+        }
+      }
+    }
+
     for (uint64_t i = start; i < start + FLAGS_scan_length; i++) {
       BlobHandle handle = index[i];
       BlobRecord record;
@@ -214,6 +242,16 @@ int main(int argc, char **argv) {
         printf("failed to read key %lu, %s\n", i, s.ToString().c_str());
         return 0;
       }
+      if (FLAGS_readahead) {
+        int reader = is_ordered[j]?0:1;
+        uint64_t blockStart = index[j].offset / 4096;
+        if (prefetched[reader].find(blockStart) == prefetched[reader].end()) {
+          readahead(fd[reader], index[j].offset, index[j].size);
+          prefetched[reader].insert(blockStart);
+        }
+        j++;
+      }
+
       BlobDecoder decoder;
       s = decoder.DecodeHeader(&blob);
       if (s.ok()) {
@@ -232,7 +270,8 @@ int main(int argc, char **argv) {
     }
   }
   uint64_t end_time = env->NowMicros();
-  printf("Elapsed time (us): %lu\n", end_time - start_time);
+  double throughput = (double)(FLAGS_value_size*FLAGS_scan_length*FLAGS_scan_times)/(1000000*(end_time-start_time));
+  printf("Elapsed time (us): %lu, throughput: %f MB/s\n", end_time - start_time, throughput);
   ordered_reader.reset();
   unordered_reader.reset();
   if (FLAGS_cleanup) {
@@ -248,4 +287,5 @@ int main(int argc, char **argv) {
     }
   }
   return 0;
+  std::cout << IOError("", "", 0).ToString() << std::endl;   // for pass compilation;
 }

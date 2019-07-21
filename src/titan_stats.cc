@@ -7,6 +7,8 @@
 namespace rocksdb {
 namespace titandb {
 
+std::unordered_map<TitanStopWatch::TimeStats , std::atomic<uint64_t >> TitanStopWatch::stats_{};
+
 static const std::string titandb_prefix = "rocksdb.titandb.";
 
 static const std::string live_blob_size = "live-blob-size";
