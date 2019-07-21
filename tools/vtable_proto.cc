@@ -176,6 +176,16 @@ int main(int argc, char **argv) {
     iter = iter + 0.009 * num_keys;
   }
 
+  vector<int> orderlevel(num_keys);
+  for (uint64_t i = 0; i < num_keys; i++) {
+    if (i < num_keys * 0.9)
+      orderlevel[keys[i]] = 2;
+    else if (i < num_keys * 0.99)
+      orderlevel[keys[i]] = 1;
+    else
+      orderlevel[keys[i]] = 0;
+  }
+
   std::vector<BlobHandle> index(num_keys);
   Env *env = Env::Default();
   Status s = env->CreateDirIfMissing(FLAGS_dir);
@@ -195,18 +205,35 @@ int main(int argc, char **argv) {
   int fd = reinterpret_cast<MyRandomAccessFile *>(moreOrderedReader->file())->GetFd();
   char buffer[static_cast<size_t>(FLAGS_value_size + 100)];
   DropPagecache();
-  uint64_t start_time = env->NowMicros();
+  uint64_t time_used = 0;
+  std::thread t;
   for (uint64_t k = 0; k < FLAGS_scan_times; k++) {
+    uint64_t start_time = env->NowMicros();
     uint64_t start = rnd.Uniform(num_keys - FLAGS_scan_length), j = start;
     if (FLAGS_readahead) {
       // pre fectch 32 values
-      for (; j < start + 32; j++) {
-        uint64_t blockStart = index[j].offset / 4096;
-        if (prefetched.find(blockStart) == prefetched.end()) {
-          readahead(fd, index[j].offset, index[j].size);
-          prefetched.insert(blockStart);
+      t = std::thread([&]{
+        for (; j < start + FLAGS_scan_length; j++) {
+          if (FLAGS_scan_length<1000||orderlevel[j] != 2) {
+            uint64_t blockStart = index[j].offset / 4096;
+            if (prefetched.find(blockStart) == prefetched.end()) {
+              readahead(fd, index[j].offset, index[j].size);
+              prefetched.insert(blockStart);
+            }
+          }
+        }
+      });
+      /*
+      for (; j < start + FLAGS_scan_length; j++) {
+        if (FLAGS_scan_length<1000||orderlevel[j] != 2) {
+          uint64_t blockStart = index[j].offset / 4096;
+          if (prefetched.find(blockStart) == prefetched.end()) {
+            readahead(fd, index[j].offset, index[j].size);
+            prefetched.insert(blockStart);
+          }
         }
       }
+      */
     }
 
     for (uint64_t i = start; i < start + FLAGS_scan_length; i++) {
@@ -220,14 +247,18 @@ int main(int argc, char **argv) {
         printf("failed to get value:%s\n", s.ToString().c_str());
         return 0;
       }
+      /*
       if (FLAGS_readahead) {
-        uint64_t blockStart = index[j].offset / 4096;
-        if (prefetched.find(blockStart) == prefetched.end()) {
-          readahead(fd, index[j].offset, index[j].size);
-          prefetched.insert(blockStart);
+        if(FLAGS_scan_length<1000||orderlevel[j]!=2) {
+          uint64_t blockStart = index[j].offset / 4096;
+          if (prefetched.find(blockStart) == prefetched.end()) {
+            readahead(fd, index[j].offset, index[j].size);
+            prefetched.insert(blockStart);
+          }
         }
         j++;
       }
+       */
 
       BlobDecoder decoder;
       s = decoder.DecodeHeader(&blob);
@@ -245,10 +276,12 @@ int main(int argc, char **argv) {
         return 0;
       }
     }
+    time_used += env->NowMicros()-start_time;
+    t.join();
   }
-  uint64_t end_time = env->NowMicros();
-  double throughput = (double)(FLAGS_value_size*FLAGS_scan_length*FLAGS_scan_times)/(1000000*(end_time-start_time));
-  printf("Elapsed time (us): %lu, throughput: %f MB/s\n", end_time - start_time, throughput);
+  double throughput =
+      (double) (FLAGS_value_size * FLAGS_scan_length * FLAGS_scan_times) / time_used;
+  printf("Elapsed time (us): %lu, throughput: %f MB/s\n", time_used, throughput);
   moreOrderedReader.reset();
   if (FLAGS_cleanup) {
     s = env->DeleteFile(FLAGS_dir + "/moreOrdered");
