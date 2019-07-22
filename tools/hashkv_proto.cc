@@ -287,7 +287,6 @@ int main(int argc, char **argv) {
     time_used += env->NowMicros() - start_time;
     t.join();
   }
-  uint64_t end_time = env->NowMicros();
   double throughput = (double)(FLAGS_value_size*FLAGS_scan_length*FLAGS_scan_times)/time_used;
   printf("Elapsed time (us): %lu, throughput: %f MB/s\n", time_used, throughput);
   ordered_reader.reset();

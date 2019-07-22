@@ -194,15 +194,31 @@ int main(int argc, char **argv) {
   }
   Random64 rnd(static_cast<uint64_t>(seed));
   std::unique_ptr<RandomAccessFileReader> moreOrderedReader;
+  std::unique_ptr<RandomAccessFileReader> orderedReader;
+  std::unique_ptr<RandomAccessFileReader> unOrderedReader;
   s = GenerateFile(
-      env, "moreOrdered", rnd, keys, 0, num_keys, &index, &moreOrderedReader);
+      env, "moreOrdered", rnd, keys, 0, num_keys * 0.9, &index, &moreOrderedReader);
   if (!s.ok()) {
     printf("Failed to generate moreordered blob file: %s\n", s.ToString().c_str());
     return 0;
   }
+  s = GenerateFile(
+      env, "ordered", rnd, keys, num_keys * 0.99, num_keys * 0.99, &index, &moreOrderedReader);
+  if (!s.ok()) {
+    printf("Failed to generate ordered blob file: %s\n", s.ToString().c_str());
+    return 0;
+  }
+  s = GenerateFile(
+      env, "unOrdered", rnd, keys, num_keys * 0.99, num_keys, &index, &moreOrderedReader);
+  if (!s.ok()) {
+    printf("Failed to generate unordered blob file: %s\n", s.ToString().c_str());
+    return 0;
+  }
 
-  unordered_set<uint64_t> prefetched;
-  int fd = reinterpret_cast<MyRandomAccessFile *>(moreOrderedReader->file())->GetFd();
+  unordered_set<uint64_t> prefetched[2];
+  int fd[2];
+  fd[0] = reinterpret_cast<MyRandomAccessFile *>(unOrderedReader->file())->GetFd();
+  fd[1] = reinterpret_cast<MyRandomAccessFile *>(orderedReader->file())->GetFd();
   char buffer[static_cast<size_t>(FLAGS_value_size + 100)];
   DropPagecache();
   uint64_t time_used = 0;
@@ -212,13 +228,13 @@ int main(int argc, char **argv) {
     uint64_t start = rnd.Uniform(num_keys - FLAGS_scan_length), j = start;
     if (FLAGS_readahead) {
       // pre fectch 32 values
-      t = std::thread([&]{
+      t = std::thread([&] {
         for (; j < start + FLAGS_scan_length; j++) {
-          if (FLAGS_scan_length<1000||orderlevel[j] != 2) {
+          if (FLAGS_scan_length < 1000 || orderlevel[j] != 2) {
             uint64_t blockStart = index[j].offset / 4096;
-            if (prefetched.find(blockStart) == prefetched.end()) {
-              readahead(fd, index[j].offset, index[j].size);
-              prefetched.insert(blockStart);
+            if (prefetched[orderlevel[j]].find(blockStart) == prefetched[orderlevel[j]].end()) {
+              readahead(fd[orderlevel[j]], index[j].offset, index[j].size);
+              prefetched[orderlevel[j]].insert(blockStart);
             }
           }
         }
@@ -241,8 +257,12 @@ int main(int argc, char **argv) {
       BlobRecord record;
       Slice blob;
       OwnedSlice owned_buffer;
-
-      s = moreOrderedReader->Read(handle.offset, handle.size, &blob, buffer);
+      if (orderlevel[i] == 2)
+        s = moreOrderedReader->Read(handle.offset, handle.size, &blob, buffer);
+      else if (orderlevel[i] == 1)
+        s = orderedReader->Read(handle.offset, handle.size, &blob, buffer);
+      else
+        s = unOrderedReader->Read(handle.offset, handle.size, &blob, buffer);
       if (!s.ok()) {
         printf("failed to get value:%s\n", s.ToString().c_str());
         return 0;
@@ -276,7 +296,7 @@ int main(int argc, char **argv) {
         return 0;
       }
     }
-    time_used += env->NowMicros()-start_time;
+    time_used += env->NowMicros() - start_time;
     t.join();
   }
   double throughput =
