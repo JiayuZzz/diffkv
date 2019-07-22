@@ -191,12 +191,11 @@ int main(int argc, char **argv) {
   size_t prefetch_size = 0;
   DropPagecache();
   uint64_t time_used = 0;
-  std::thread t;
   for (uint64_t k = 0; k < FLAGS_scan_times; k++) {
     uint64_t start_time = env->NowMicros();
-    uint64_t start = rnd.Uniform(num_keys - FLAGS_scan_length), j=start;
-    if (FLAGS_readahead) {
-      t = std::thread([&]{
+    uint64_t start = rnd.Uniform(num_keys - FLAGS_scan_length), j = start;
+    std::thread t([&] {
+      if (FLAGS_readahead) {
         for (; j < start + FLAGS_scan_length; j++) {
           if (!is_ordered[j]) {
             uint64_t blockStart = index[j].offset / 4096;
@@ -206,20 +205,20 @@ int main(int argc, char **argv) {
             }
           }
         }
-      });
-      /*
-      for (; j < start + FLAGS_scan_length; j++) {
-        int reader = is_ordered[j] ? 0 : 1;
-        if (!is_ordered[j]) {
-          uint64_t blockStart = index[j].offset / 4096;
-          if (prefetched[reader].find(blockStart) == prefetched[reader].end()) {
-            readahead(fd[reader], index[j].offset, index[j].size);
-            prefetched[reader].insert(blockStart);
-          }
+      }
+    });
+    /*
+    for (; j < start + FLAGS_scan_length; j++) {
+      int reader = is_ordered[j] ? 0 : 1;
+      if (!is_ordered[j]) {
+        uint64_t blockStart = index[j].offset / 4096;
+        if (prefetched[reader].find(blockStart) == prefetched[reader].end()) {
+          readahead(fd[reader], index[j].offset, index[j].size);
+          prefetched[reader].insert(blockStart);
         }
       }
-      */
     }
+    */
 
     for (uint64_t i = start; i < start + FLAGS_scan_length; i++) {
       BlobHandle handle = index[i];
@@ -287,7 +286,7 @@ int main(int argc, char **argv) {
     time_used += env->NowMicros() - start_time;
     t.join();
   }
-  double throughput = (double)(FLAGS_value_size*FLAGS_scan_length*FLAGS_scan_times)/time_used;
+  double throughput = (double) (FLAGS_value_size * FLAGS_scan_length * FLAGS_scan_times) / time_used;
   printf("Elapsed time (us): %lu, throughput: %f MB/s\n", time_used, throughput);
   ordered_reader.reset();
   unordered_reader.reset();

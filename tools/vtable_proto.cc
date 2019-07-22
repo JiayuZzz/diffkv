@@ -34,7 +34,7 @@ DEFINE_string(dir,
 DEFINE_uint64(num_keys,
               10000000, "");
 DEFINE_uint64(scan_length, 100000, "");
-DEFINE_uint64(scan_times, 100, "");
+DEFINE_uint64(scan_times, 10, "");
 DEFINE_double(ordered_keys_ratio,
               0.0, "");
 DEFINE_uint64(value_size,
@@ -147,6 +147,7 @@ void DropPagecache() {
 class MyRandomAccessFile : public PosixRandomAccessFile {
 public:
   int GetFd() {
+    printf("3\n");
     return fd_;
   }
 };
@@ -203,13 +204,13 @@ int main(int argc, char **argv) {
     return 0;
   }
   s = GenerateFile(
-      env, "ordered", rnd, keys, num_keys * 0.99, num_keys * 0.99, &index, &moreOrderedReader);
+      env, "ordered", rnd, keys, num_keys * 0.9, num_keys * 0.99, &index, &orderedReader);
   if (!s.ok()) {
     printf("Failed to generate ordered blob file: %s\n", s.ToString().c_str());
     return 0;
   }
   s = GenerateFile(
-      env, "unOrdered", rnd, keys, num_keys * 0.99, num_keys, &index, &moreOrderedReader);
+      env, "unOrdered", rnd, keys, num_keys * 0.99, num_keys, &index, &unOrderedReader);
   if (!s.ok()) {
     printf("Failed to generate unordered blob file: %s\n", s.ToString().c_str());
     return 0;
@@ -217,18 +218,24 @@ int main(int argc, char **argv) {
 
   unordered_set<uint64_t> prefetched[2];
   int fd[2];
-  fd[0] = reinterpret_cast<MyRandomAccessFile *>(unOrderedReader->file())->GetFd();
-  fd[1] = reinterpret_cast<MyRandomAccessFile *>(orderedReader->file())->GetFd();
+  printf("1\n");
+  auto p1 = unOrderedReader->file();
+  auto p2 = orderedReader->file();
+  printf("1.5\n");
+  MyRandomAccessFile* f1 = reinterpret_cast<MyRandomAccessFile *>(p1);
+  MyRandomAccessFile* f2 = reinterpret_cast<MyRandomAccessFile *>(p2);
+  printf("2\n");
+  fd[0] = f1->GetFd();
+  fd[1] = f2->GetFd();
   char buffer[static_cast<size_t>(FLAGS_value_size + 100)];
   DropPagecache();
   uint64_t time_used = 0;
-  std::thread t;
   for (uint64_t k = 0; k < FLAGS_scan_times; k++) {
     uint64_t start_time = env->NowMicros();
     uint64_t start = rnd.Uniform(num_keys - FLAGS_scan_length), j = start;
-    if (FLAGS_readahead) {
-      // pre fectch 32 values
-      t = std::thread([&] {
+    std::thread t([&] {
+      if (FLAGS_readahead) {
+        // pre fectch 32 values
         for (; j < start + FLAGS_scan_length; j++) {
           if (FLAGS_scan_length < 1000 || orderlevel[j] != 2) {
             uint64_t blockStart = index[j].offset / 4096;
@@ -238,19 +245,19 @@ int main(int argc, char **argv) {
             }
           }
         }
-      });
-      /*
-      for (; j < start + FLAGS_scan_length; j++) {
-        if (FLAGS_scan_length<1000||orderlevel[j] != 2) {
-          uint64_t blockStart = index[j].offset / 4096;
-          if (prefetched.find(blockStart) == prefetched.end()) {
-            readahead(fd, index[j].offset, index[j].size);
-            prefetched.insert(blockStart);
-          }
+      }
+    });
+    /*
+    for (; j < start + FLAGS_scan_length; j++) {
+      if (FLAGS_scan_length<1000||orderlevel[j] != 2) {
+        uint64_t blockStart = index[j].offset / 4096;
+        if (prefetched.find(blockStart) == prefetched.end()) {
+          readahead(fd, index[j].offset, index[j].size);
+          prefetched.insert(blockStart);
         }
       }
-      */
     }
+    */
 
     for (uint64_t i = start; i < start + FLAGS_scan_length; i++) {
       BlobHandle handle = index[i];
