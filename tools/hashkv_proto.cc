@@ -240,7 +240,7 @@ int main(int argc, char **argv) {
           }
           s = ordered_reader->Read(handle.offset, handle.size, &blob, buffer);
         } else {
-          if (handle.offset + handle.size > prefetch_offset + prefetch_size) {
+          if (handle.offset < prefetch_offset || handle.offset + handle.size > prefetch_offset + prefetch_size) {
             Slice prefetch_content;
             s = ordered_reader->Read(handle.offset, FLAGS_prefetch_size, &prefetch_content, prefetch_buffer);
             prefetch_offset = handle.offset;

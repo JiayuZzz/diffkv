@@ -7,7 +7,7 @@
 namespace rocksdb {
 namespace titandb {
 
-std::unordered_map<TitanStopWatch::TimeStats , std::atomic<uint64_t >> TitanStopWatch::stats_{};
+std::unordered_map<uint16_t , std::atomic<uint64_t >> TitanStopWatch::stats_{};
 
 static const std::string titandb_prefix = "rocksdb.titandb.";
 

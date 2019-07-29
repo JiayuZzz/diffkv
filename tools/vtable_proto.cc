@@ -147,7 +147,6 @@ void DropPagecache() {
 class MyRandomAccessFile : public PosixRandomAccessFile {
 public:
   int GetFd() {
-    printf("3\n");
     return fd_;
   }
 };
@@ -218,13 +217,10 @@ int main(int argc, char **argv) {
 
   unordered_set<uint64_t> prefetched[2];
   int fd[2];
-  printf("1\n");
   auto p1 = unOrderedReader->file();
   auto p2 = orderedReader->file();
-  printf("1.5\n");
   MyRandomAccessFile* f1 = reinterpret_cast<MyRandomAccessFile *>(p1);
   MyRandomAccessFile* f2 = reinterpret_cast<MyRandomAccessFile *>(p2);
-  printf("2\n");
   fd[0] = f1->GetFd();
   fd[1] = f2->GetFd();
   char buffer[static_cast<size_t>(FLAGS_value_size + 100)];
