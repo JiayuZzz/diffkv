@@ -69,6 +69,7 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
       return;
     }
     auto storage = blob_storage_.lock();
+
     auto meta_ = storage->FindFile(index.file_number).lock();
     if(meta_) {
       if(meta_->level_<level_){
@@ -84,7 +85,8 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
             AppendInternalKey(&index_key, ikey);
             base_builder_->Add(index_key, index_value);
             if(--meta_->valid_entries_==0){
-              storage->MarkFileObsolete(meta_, 0);
+              storage->MarkFileObsolete(meta_, 1);
+              std::cerr<<"delete "<<index.file_number<<std::endl;
             }
             base_builder_->Add(index_key, index_value);
           }
@@ -155,6 +157,7 @@ Status TitanTableBuilder::Finish() {
           blob_handle_->GetNumber(), blob_handle_->GetFile()->GetFileSize());
       file->valid_entries_ = entries_;
       file->level_ = level_;
+      entries_ = 0;
       file->FileStateTransit(BlobFileMeta::FileEvent::kFlushOrCompactionOutput);
       status_ =
           blob_manager_->FinishFile(cf_id_, file, std::move(blob_handle_));
