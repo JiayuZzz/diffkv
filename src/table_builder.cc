@@ -5,6 +5,7 @@
 #endif
 
 #include <inttypes.h>
+#include "iostream"
 
 namespace rocksdb {
 namespace titandb {
@@ -60,6 +61,38 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
       AppendInternalKey(&index_key, ikey);
       base_builder_->Add(index_key, index_value);
     }
+  } else if (ikey.type == kTypeBlobIndex) {
+    BlobIndex index;
+    Slice copy = value;
+    status_ = index.DecodeFrom(&copy);
+    if( !ok()) {
+      return;
+    }
+    auto storage = blob_storage_.lock();
+    auto meta_ = storage->FindFile(index.file_number).lock();
+    if(meta_) {
+      if(meta_->level_<level_){
+        BlobRecord record;
+        PinnableSlice buffer;
+        Status s = storage->Get(ReadOptions(), index, &record, &buffer);
+        if(s.ok()){
+          std::string index_value;
+          AddBlob(ikey.user_key, record.value, &index_value);
+          if(ok()){
+            std::string index_key;
+            ikey.type = kTypeBlobIndex;
+            AppendInternalKey(&index_key, ikey);
+            base_builder_->Add(index_key, index_value);
+            if(--meta_->valid_entries_==0){
+              storage->MarkFileObsolete(meta_, 0);
+            }
+            base_builder_->Add(index_key, index_value);
+          }
+        }
+      } else {
+        base_builder_->Add(key, value);
+      }
+    }
   } else {
     base_builder_->Add(key, value);
   }
@@ -95,6 +128,7 @@ void TitanTableBuilder::AddBlob(const Slice& key, const Slice& value,
   RecordTick(stats_, BLOB_DB_BLOB_FILE_BYTES_WRITTEN, index.blob_handle.size);
   if (ok()) {
     index.EncodeTo(index_value);
+    entries_++;
   }
 }
 
@@ -119,6 +153,8 @@ Status TitanTableBuilder::Finish() {
                      blob_handle_->GetNumber());
       std::shared_ptr<BlobFileMeta> file = std::make_shared<BlobFileMeta>(
           blob_handle_->GetNumber(), blob_handle_->GetFile()->GetFileSize());
+      file->valid_entries_ = entries_;
+      file->level_ = level_;
       file->FileStateTransit(BlobFileMeta::FileEvent::kFlushOrCompactionOutput);
       status_ =
           blob_manager_->FinishFile(cf_id_, file, std::move(blob_handle_));

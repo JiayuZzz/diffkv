@@ -101,6 +101,9 @@ struct BlobIndex {
 // file_size_        : varint64
 class BlobFileMeta {
  public:
+  int level_;
+  long valid_entries_{0};
+
   enum class FileEvent {
     kInit,
     kFlushCompleted,
@@ -152,6 +155,8 @@ class BlobFileMeta {
 
   // Not persistent field
   FileState state_{FileState::kInit};
+
+  // vtable: int level_;
 
   uint64_t discardable_size_{0};
   // gc_mark is set to true when this file is recovered from re-opening the DB

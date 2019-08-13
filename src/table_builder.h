@@ -16,14 +16,15 @@ class TitanTableBuilder : public TableBuilder {
                     const TitanCFOptions& cf_options,
                     std::unique_ptr<TableBuilder> base_builder,
                     std::shared_ptr<BlobFileManager> blob_manager,
-                    std::weak_ptr<BlobStorage> blob_storage, TitanStats* stats)
+                    std::weak_ptr<BlobStorage> blob_storage, TitanStats* stats, int level)
       : cf_id_(cf_id),
         db_options_(db_options),
         cf_options_(cf_options),
         base_builder_(std::move(base_builder)),
         blob_manager_(blob_manager),
         blob_storage_(blob_storage),
-        stats_(stats) {}
+        stats_(stats),
+        level_(level) {}
 
   void Add(const Slice& key, const Slice& value) override;
 
@@ -55,8 +56,10 @@ class TitanTableBuilder : public TableBuilder {
   std::shared_ptr<BlobFileManager> blob_manager_;
   std::unique_ptr<BlobFileBuilder> blob_builder_;
   std::weak_ptr<BlobStorage> blob_storage_;
+  uint64_t entries_{0};
 
   TitanStats* stats_;
+  int level_;
 };
 
 }  // namespace titandb
