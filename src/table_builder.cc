@@ -84,10 +84,10 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
             ikey.type = kTypeBlobIndex;
             AppendInternalKey(&index_key, ikey);
             base_builder_->Add(index_key, index_value);
-            if(--meta->valid_entries_==0){
-              storage->MarkFileObsolete(meta, 1);
+            // if(--meta->valid_entries_==0){
+              // storage->MarkFileObsolete(meta, 1);
               // std::cerr<<"delete "<<"level "<<meta->level_<<"file "<<index.file_number<<std::endl;
-            }
+            // }
             // base_builder_->Add(index_key, index_value);
           }
         }
@@ -158,7 +158,9 @@ void TitanTableBuilder::FinishBlob(){
       std::shared_ptr<BlobFileMeta> file = std::make_shared<BlobFileMeta>(
           blob_handle_->GetNumber(), blob_handle_->GetFile()->GetFileSize());
       // std::cerr<<"generate level "<<level_<<"file "<<file->file_number()<<"size "<<added_size_<<std::endl;
-      file->valid_entries_ = entries_;
+      // if (level_==0) {
+        file->valid_entries_ = entries_;
+      // }
       file->level_ = level_;
       file->FileStateTransit(BlobFileMeta::FileEvent::kFlushOrCompactionOutput);
       status_ =
