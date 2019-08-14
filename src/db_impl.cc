@@ -16,6 +16,7 @@
 #include "db_iter.h"
 #include "table_factory.h"
 #include "titan_build_version.h"
+#include "iostream"
 
 namespace rocksdb {
 namespace titandb {
@@ -1045,7 +1046,12 @@ void TitanDBImpl::OnCompactionCompleted(
       if (!file->is_obsolete()) {
         delta += -bfs.second;
       }
-      file->AddDiscardableSize(static_cast<uint64_t>(-bfs.second));
+      // file->AddDiscardableSize(static_cast<uint64_t>(-bfs.second));
+      file->valid_entries_ += bfs.second;
+      std::cerr<<"valid entries "<<file->valid_entries_<<"for file "<<file->file_number()<<" after compaction"<<std::endl;
+      if (file->valid_entries_==0) {
+          bs->MarkFileObsolete(file,1);
+      }
     }
     SubStats(stats_.get(), compaction_job_info.cf_id,
              TitanInternalStats::LIVE_BLOB_SIZE, delta);

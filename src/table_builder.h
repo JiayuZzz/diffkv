@@ -47,6 +47,8 @@ class TitanTableBuilder : public TableBuilder {
 
   void AddBlob(const Slice& key, const Slice& value, std::string* index_value);
 
+  void FinishBlob();
+
   Status status_;
   uint32_t cf_id_;
   TitanDBOptions db_options_;
@@ -57,6 +59,7 @@ class TitanTableBuilder : public TableBuilder {
   std::unique_ptr<BlobFileBuilder> blob_builder_;
   std::weak_ptr<BlobStorage> blob_storage_;
   uint64_t entries_{0};
+  uint64_t added_size_{0};
 
   TitanStats* stats_;
   int level_;

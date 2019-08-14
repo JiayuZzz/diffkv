@@ -58,9 +58,9 @@ Status BlobFileSizeCollector::AddUserKey(const Slice& /* key */,
 
   auto iter = blob_files_size_.find(index.file_number);
   if (iter == blob_files_size_.end()) {
-    blob_files_size_[index.file_number] = index.blob_handle.size;
+    blob_files_size_[index.file_number] = 1;
   } else {
-    iter->second += index.blob_handle.size;
+    iter->second += 1;
   }
 
   return Status::OK();
