@@ -138,7 +138,18 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
   blob_manager_.reset(new FileManager(this));
 }
 
-TitanDBImpl::~TitanDBImpl() { Close(); }
+TitanDBImpl::~TitanDBImpl() { 
+  auto stats = stats_->statistics();
+  std::cout<<"blob file write bytes "<<stats->getTickerCount(BLOB_DB_BLOB_FILE_BYTES_WRITTEN)<<std::endl;
+  std::cout<<"blob file read bytes "<<stats->getTickerCount(BLOB_DB_BLOB_FILE_BYTES_READ)<<std::endl;
+  std::cout<<"blob file write micros "<<stats->getTickerCount(BLOB_DB_BLOB_FILE_WRITE_MICROS)<<std::endl;
+  std::cout<<"blob file sync micros "<<stats->getTickerCount(BLOB_DB_BLOB_FILE_SYNC_MICROS)<<std::endl;
+  std::cout<<"blob file gc relocated bytes "<<stats->getTickerCount(BLOB_DB_GC_BYTES_RELOCATED)<<std::endl;
+  std::cout<<"blob file gc overwritten bytes "<<stats->getTickerCount(BLOB_DB_GC_BYTES_OVERWRITTEN)<<std::endl;
+  std::cout<<"blob file gc expired bytes "<<stats->getTickerCount(BLOB_DB_GC_BYTES_EXPIRED)<<std::endl;
+  std::cout<<stats->ToString()<<std::endl;
+  Close(); 
+}
 
 void TitanDBImpl::StartBackgroundTasks() {
   if (!thread_purge_obsolete_) {
