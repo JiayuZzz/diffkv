@@ -1058,9 +1058,9 @@ void TitanDBImpl::OnCompactionCompleted(
         delta += -bfs.second;
       }
       // file->AddDiscardableSize(static_cast<uint64_t>(-bfs.second));
-      std::cerr<<"valid entries "<<file->valid_entries_<<"for file "<<file->file_number()<<"level "<<file->level_<<" before compaction"<<std::endl;
+      // std::cerr<<"valid entries "<<file->valid_entries_<<"for file "<<file->file_number()<<"level "<<file->level_<<" before compaction"<<std::endl;
       file->valid_entries_ += bfs.second;
-      std::cerr<<"valid entries "<<file->valid_entries_<<"for file "<<file->file_number()<<"level "<<file->level_<<" after compaction"<<std::endl;
+      // std::cerr<<"valid entries "<<file->valid_entries_<<"for file "<<file->file_number()<<"level "<<file->level_<<" after compaction"<<std::endl;
       if (file->valid_entries_==0) {
           bs->MarkFileObsolete(file,1);
       }

@@ -72,7 +72,7 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
 
     auto meta = storage->FindFile(index.file_number).lock();
     if(meta) {
-      if(meta->level_<level_||meta->valid_entries_<level_*5000){
+      if((meta->level_<level_&&level_>1)||meta->valid_entries_<level_*5000){
         BlobRecord record;
         PinnableSlice buffer;
         Status s = storage->Get(ReadOptions(), index, &record, &buffer);
