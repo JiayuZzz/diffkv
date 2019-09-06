@@ -11,25 +11,27 @@ BlobFileSizeCollectorFactory::CreateTablePropertiesCollector(
 }
 
 const std::string BlobFileSizeCollector::kPropertiesName =
-    "TitanDB.blob_discardable_size";
+    "TitanDB.blob_discardable_data";
 
 bool BlobFileSizeCollector::Encode(
-    const std::map<uint64_t, uint64_t>& blob_files_size, std::string* result) {
-  PutVarint32(result, static_cast<uint32_t>(blob_files_size.size()));
-  for (const auto& bfs : blob_files_size) {
+    const std::map<uint64_t, BlobFileData>& blob_files_data, std::string* result) {
+  PutVarint32(result, static_cast<uint32_t>(blob_files_data.size()));
+  for (const auto& bfs : blob_files_data) {
     PutVarint64(result, bfs.first);
-    PutVarint64(result, bfs.second);
+    PutVarint64(result, bfs.second.blob_files_size_);
+    PutVarint64(result, bfs.second.blob_files_entries_);
   }
   return true;
 }
 bool BlobFileSizeCollector::Decode(
-    Slice* slice, std::map<uint64_t, uint64_t>* blob_files_size) {
+    Slice* slice, std::map<uint64_t, BlobFileData>* blob_files_data) {
   uint32_t num = 0;
   if (!GetVarint32(slice, &num)) {
     return false;
   }
   uint64_t file_number;
   uint64_t size;
+  uint64_t entries;
   for (uint32_t i = 0; i < num; ++i) {
     if (!GetVarint64(slice, &file_number)) {
       return false;
@@ -37,7 +39,10 @@ bool BlobFileSizeCollector::Decode(
     if (!GetVarint64(slice, &size)) {
       return false;
     }
-    (*blob_files_size)[file_number] = size;
+    if (!GetVarint64(slice, &entries)) {
+      return false;
+    }
+    blob_files_data->insert(file_number, BlobFileData(size, entries));
   }
   return true;
 }
@@ -56,23 +61,24 @@ Status BlobFileSizeCollector::AddUserKey(const Slice& /* key */,
     return s;
   }
 
-  auto iter = blob_files_size_.find(index.file_number);
-  if (iter == blob_files_size_.end()) {
-    blob_files_size_[index.file_number] = index.blob_handle.size;
+  auto iter = blob_files_data_.find(index.file_number);
+  if (iter == blob_files_data_.end()) {
+    blob_files_data_[index.file_number] = BlobFileData(index.blob_handle.size, 1);
   } else {
-    iter->second += index.blob_handle.size;
+    iter->second.blob_files_size_ += index.blob_handle.size;
+    iter->second.blob_files_entries_ += 1;
   }
 
   return Status::OK();
 }
 
 Status BlobFileSizeCollector::Finish(UserCollectedProperties* properties) {
-  if (blob_files_size_.empty()) {
+  if (blob_files_data_.empty()) {
     return Status::OK();
   }
 
   std::string res;
-  bool ok __attribute__((__unused__)) = Encode(blob_files_size_, &res);
+  bool ok __attribute__((__unused__)) = Encode(blob_files_data_, &res);
   assert(ok);
   assert(!res.empty());
   properties->emplace(std::make_pair(kPropertiesName, res));

@@ -160,6 +160,7 @@ class BlobFileMeta {
   void FileStateTransit(const FileEvent& event);
 
   void AddDiscardableSize(uint64_t _discardable_size);
+  void AddDiscardableEntries(uint64_t _discardable_entries);
   double GetDiscardableRatio() const;
 
  private:
@@ -173,6 +174,7 @@ class BlobFileMeta {
   FileState state_{FileState::kInit};
 
   uint64_t discardable_size_{0};
+  uint64_t discardable_entries_{0};
   // gc_mark is set to true when this file is recovered from re-opening the DB
   // that means this file needs to be checked for GC
   bool gc_mark_{false};
@@ -225,6 +227,14 @@ Status DecodeInto(const Slice& src, T* target) {
   }
   return s;
 }
+
+struct BlobFileData {
+  uint64_t blob_files_size_;
+  uint64_t blob_files_entries_;
+
+  BlobFileData() = default;
+  BlobFileData(uint64_t s, uint64_t e):blob_files_size_(s), blob_files_entries_(e) {}
+};
 
 }  // namespace titandb
 }  // namespace rocksdb

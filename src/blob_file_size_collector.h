@@ -5,6 +5,7 @@
 #include "rocksdb/table_properties.h"
 #include "util/coding.h"
 #include "version_set.h"
+#include "blob_format.h"
 
 namespace rocksdb {
 namespace titandb {
@@ -22,10 +23,10 @@ class BlobFileSizeCollector final : public TablePropertiesCollector {
  public:
   const static std::string kPropertiesName;
 
-  static bool Encode(const std::map<uint64_t, uint64_t>& blob_files_size,
+  static bool Encode(const std::map<uint64_t, BlobFileData>& blob_files_data,
                      std::string* result);
   static bool Decode(Slice* slice,
-                     std::map<uint64_t, uint64_t>* blob_files_size);
+                     std::map<uint64_t, BlobFileData>* blob_files_data);
 
   Status AddUserKey(const Slice& key, const Slice& value, EntryType type,
                     SequenceNumber seq, uint64_t file_size) override;
@@ -36,7 +37,7 @@ class BlobFileSizeCollector final : public TablePropertiesCollector {
   const char* Name() const override { return "BlobFileSizeCollector"; }
 
  private:
-  std::map<uint64_t, uint64_t> blob_files_size_;
+  std::map<uint64_t, BlobFileData> blob_files_data_;
 };
 
 }  // namespace titandb
