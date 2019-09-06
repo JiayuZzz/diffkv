@@ -119,6 +119,7 @@ class BlobFileMeta {
     kFlushOrCompactionOutput,
     kDbRestart,
     kDelete,
+    kToMerge,
   };
 
   enum class FileState {
@@ -128,6 +129,7 @@ class BlobFileMeta {
     kBeingGC,     // being gced
     kPendingGC,   // output of gc, waiting gc finish and keys adding to LSM
     kObsolete,    // already gced, but wait to be physical deleted
+    kNeedMerge,
   };
 
   BlobFileMeta() = default;
@@ -160,6 +162,8 @@ class BlobFileMeta {
   void FileStateTransit(const FileEvent& event);
 
   void AddDiscardableSize(uint64_t _discardable_size);
+  void AddDiscardableEntries(uint64_t _discardable_entries);
+  bool Expired() { return file_entries_ > 0 && discardable_entries_ == file_entries_; }
   double GetDiscardableRatio() const;
 
  private:
@@ -173,6 +177,7 @@ class BlobFileMeta {
   FileState state_{FileState::kInit};
 
   uint64_t discardable_size_{0};
+  uint64_t discardable_entries_{0};
   // gc_mark is set to true when this file is recovered from re-opening the DB
   // that means this file needs to be checked for GC
   bool gc_mark_{false};
