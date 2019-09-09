@@ -764,7 +764,8 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
 
     for (auto& it : sst_blob_files_data) {
       discardable_blob_files_data[it.first].first += it.second.blob_files_size_;
-      discardable_blob_files_data[it.first].second += it.second.blob_files_entries_;
+      discardable_blob_files_data[it.first].second +=
+          it.second.blob_files_entries_;
     }
   }
 
@@ -804,15 +805,17 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
     file->AddDiscardableSize(bfd.second.first);
     file->AddDiscardableEntries(bfd.second.second);
     if (cf_options.level_merge) {
-      if(file->Expired()) {
-        edit.DeleteBlobFile(file->file_number(), db_impl_->GetLatestSequenceNumber());
-      } else if (file->GetDiscardableRatio()>cf_options.blob_file_discardable_ratio) {
+      if (file->Expired()) {
+        edit.DeleteBlobFile(file->file_number(),
+                            db_impl_->GetLatestSequenceNumber());
+      } else if (file->GetDiscardableRatio() >
+                 cf_options.blob_file_discardable_ratio) {
         file->FileStateTransit(BlobFileMeta::FileEvent::kToMerge);
       }
     }
   }
   SubStats(stats_.get(), cf_id, TitanInternalStats::LIVE_BLOB_SIZE, size_delta);
-  if(cf_options.level_merge){
+  if (cf_options.level_merge) {
     vset_->LogAndApply(edit);
   } else {
     bs->ComputeGCScore();
@@ -1047,10 +1050,14 @@ void TitanDBImpl::OnCompactionCompleted(
         }
         auto bfs_iter = blob_files_data_diff.find(input_bfs.first);
         if (bfs_iter == blob_files_data_diff.end()) {
-          blob_files_data_diff[input_bfs.first] = {coefficient * input_bfs.second.blob_files_size_, coefficient * input_bfs.second.blob_files_entries_};
+          blob_files_data_diff[input_bfs.first] = {
+              coefficient * input_bfs.second.blob_files_size_,
+              coefficient * input_bfs.second.blob_files_entries_};
         } else {
-          bfs_iter->second.first += coefficient * input_bfs.second.blob_files_size_;
-          bfs_iter->second.second += coefficient * input_bfs.second.blob_files_entries_;
+          bfs_iter->second.first +=
+              coefficient * input_bfs.second.blob_files_size_;
+          bfs_iter->second.second +=
+              coefficient * input_bfs.second.blob_files_entries_;
         }
       }
     }
@@ -1107,17 +1114,19 @@ void TitanDBImpl::OnCompactionCompleted(
       }
       file->AddDiscardableSize(static_cast<uint64_t>(-bfd.second.first));
       file->AddDiscardableEntries(static_cast<uint64_t>(-bfd.second.second));
-      if(bs->cf_options().level_merge) {
+      if (bs->cf_options().level_merge) {
         if (file->Expired()) {
-          edit.DeleteBlobFile(file->file_number(), db_impl_->GetLatestSequenceNumber());
-        } else if (file->GetDiscardableRatio()>bs->cf_options().blob_file_discardable_ratio) {
+          edit.DeleteBlobFile(file->file_number(),
+                              db_impl_->GetLatestSequenceNumber());
+        } else if (file->GetDiscardableRatio() >
+                   bs->cf_options().blob_file_discardable_ratio) {
           file->FileStateTransit(BlobFileMeta::FileEvent::kToMerge);
         }
       }
     }
     SubStats(stats_.get(), compaction_job_info.cf_id,
              TitanInternalStats::LIVE_BLOB_SIZE, delta_size);
-    if(bs->cf_options().level_merge) {
+    if (bs->cf_options().level_merge) {
       vset_->LogAndApply(edit);
     } else {
       bs->ComputeGCScore();

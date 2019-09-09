@@ -24,7 +24,8 @@ struct BlobFileData {
   uint64_t blob_files_entries_;
 
   BlobFileData() = default;
-  BlobFileData(uint64_t s, uint64_t e):blob_files_size_(s), blob_files_entries_(e) {}
+  BlobFileData(uint64_t s, uint64_t e)
+      : blob_files_size_(s), blob_files_entries_(e) {}
 };
 
 class BlobFileSizeCollector final : public TablePropertiesCollector {
