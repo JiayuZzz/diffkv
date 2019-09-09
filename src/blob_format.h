@@ -119,6 +119,7 @@ class BlobFileMeta {
     kFlushOrCompactionOutput,
     kDbRestart,
     kDelete,
+    kToMerge,
   };
 
   enum class FileState {
@@ -128,6 +129,7 @@ class BlobFileMeta {
     kBeingGC,     // being gced
     kPendingGC,   // output of gc, waiting gc finish and keys adding to LSM
     kObsolete,    // already gced, but wait to be physical deleted
+    kNeedMerge,
   };
 
   BlobFileMeta() = default;
@@ -161,6 +163,7 @@ class BlobFileMeta {
 
   void AddDiscardableSize(uint64_t _discardable_size);
   void AddDiscardableEntries(uint64_t _discardable_entries);
+  bool Expired() { return discardable_entries_ == file_entries_; }
   double GetDiscardableRatio() const;
 
  private:
@@ -227,14 +230,6 @@ Status DecodeInto(const Slice& src, T* target) {
   }
   return s;
 }
-
-struct BlobFileData {
-  uint64_t blob_files_size_;
-  uint64_t blob_files_entries_;
-
-  BlobFileData() = default;
-  BlobFileData(uint64_t s, uint64_t e):blob_files_size_(s), blob_files_entries_(e) {}
-};
 
 }  // namespace titandb
 }  // namespace rocksdb

@@ -201,6 +201,9 @@ void BlobFileMeta::FileStateTransit(const FileEvent& event) {
       assert(state_ != FileState::kObsolete);
       state_ = FileState::kObsolete;
       break;
+    case FileEvent::kToMerge:
+      assert(state_ != FileState::kObsolete);
+      state_ = FileState::kNeedMerge;
     default:
       assert(false);
   }
@@ -213,7 +216,7 @@ void BlobFileMeta::AddDiscardableSize(uint64_t _discardable_size) {
 }
 
 void BlobFileMeta::AddDiscardableEntries(uint64_t _discardable_entries) {
-  assert(_discardable_entries < file_entries_);
+  assert(_discardable_entries <= file_entries_);
   discardable_entries_ += _discardable_entries;
   assert(discardable_entries_ <= file_entries_);
 }

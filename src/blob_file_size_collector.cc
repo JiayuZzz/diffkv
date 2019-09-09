@@ -14,7 +14,8 @@ const std::string BlobFileSizeCollector::kPropertiesName =
     "TitanDB.blob_discardable_data";
 
 bool BlobFileSizeCollector::Encode(
-    const std::map<uint64_t, BlobFileData>& blob_files_data, std::string* result) {
+    const std::map<uint64_t, BlobFileData>& blob_files_data,
+    std::string* result) {
   PutVarint32(result, static_cast<uint32_t>(blob_files_data.size()));
   for (const auto& bfs : blob_files_data) {
     PutVarint64(result, bfs.first);
@@ -42,7 +43,7 @@ bool BlobFileSizeCollector::Decode(
     if (!GetVarint64(slice, &entries)) {
       return false;
     }
-    blob_files_data->insert(file_number, BlobFileData(size, entries));
+    blob_files_data->insert({file_number, BlobFileData(size, entries)});
   }
   return true;
 }
@@ -63,7 +64,8 @@ Status BlobFileSizeCollector::AddUserKey(const Slice& /* key */,
 
   auto iter = blob_files_data_.find(index.file_number);
   if (iter == blob_files_data_.end()) {
-    blob_files_data_[index.file_number] = BlobFileData(index.blob_handle.size, 1);
+    blob_files_data_[index.file_number] =
+        BlobFileData(index.blob_handle.size, 1);
   } else {
     iter->second.blob_files_size_ += index.blob_handle.size;
     iter->second.blob_files_entries_ += 1;

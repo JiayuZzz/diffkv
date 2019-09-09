@@ -1,11 +1,11 @@
 #pragma once
 
+#include "blob_format.h"
 #include "db_impl.h"
 #include "rocksdb/listener.h"
 #include "rocksdb/table_properties.h"
 #include "util/coding.h"
 #include "version_set.h"
-#include "blob_format.h"
 
 namespace rocksdb {
 namespace titandb {
@@ -17,6 +17,14 @@ class BlobFileSizeCollectorFactory final
       TablePropertiesCollectorFactory::Context context) override;
 
   const char* Name() const override { return "BlobFileSizeCollector"; }
+};
+
+struct BlobFileData {
+  uint64_t blob_files_size_;
+  uint64_t blob_files_entries_;
+
+  BlobFileData() = default;
+  BlobFileData(uint64_t s, uint64_t e):blob_files_size_(s), blob_files_entries_(e) {}
 };
 
 class BlobFileSizeCollector final : public TablePropertiesCollector {

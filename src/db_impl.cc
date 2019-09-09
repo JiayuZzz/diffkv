@@ -739,7 +739,8 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
   }
 
   auto cf_id = column_family->GetID();
-  std::map<uint64_t, uint64_t> blob_files_size;
+  // Discardable size and discardable entries
+  std::map<uint64_t, std::pair<uint64_t, uint64_t>> discardable_blob_files_data;
   for (auto& collection : props) {
     auto& prop = collection.second;
     auto ucp_iter = prop->user_collected_properties.find(
@@ -748,10 +749,10 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
     if (ucp_iter == prop->user_collected_properties.end()) {
       continue;
     }
-    std::map<uint64_t, uint64_t> sst_blob_files_size;
+    std::map<uint64_t, BlobFileData> sst_blob_files_data;
     std::string str = ucp_iter->second;
     Slice slice{str};
-    if (!BlobFileSizeCollector::Decode(&slice, &sst_blob_files_size)) {
+    if (!BlobFileSizeCollector::Decode(&slice, &sst_blob_files_data)) {
       // TODO: Should treat it as background error and make DB read-only.
       ROCKS_LOG_ERROR(db_options_.info_log,
                       "failed to decode table property, "
@@ -761,8 +762,9 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
       continue;
     }
 
-    for (auto& it : sst_blob_files_size) {
-      blob_files_size[it.first] += it.second;
+    for (auto& it : sst_blob_files_data) {
+      discardable_blob_files_data[it.first].first += it.second.blob_files_size_;
+      discardable_blob_files_data[it.first].second += it.second.blob_files_entries_;
     }
   }
 
@@ -785,23 +787,39 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
                             " not Found.");
   }
 
-  uint64_t delta = 0;
-  for (const auto& bfs : blob_files_size) {
-    auto file = bs->FindFile(bfs.first).lock();
+  uint64_t size_delta = 0;
+  uint64_t entries_delta = 0;
+  VersionEdit edit;
+  auto cf_options = bs->cf_options();
+  for (const auto& bfd : discardable_blob_files_data) {
+    auto file = bs->FindFile(bfd.first).lock();
     if (!file) {
       // file has been gc out
       continue;
     }
     if (!file->is_obsolete()) {
-      delta += bfs.second;
+      size_delta += bfd.second.first;
+      entries_delta += bfd.second.second;
     }
-    file->AddDiscardableSize(static_cast<uint64_t>(bfs.second));
+    file->AddDiscardableSize(bfd.second.first);
+    file->AddDiscardableEntries(bfd.second.second);
+    if (cf_options.level_merge) {
+      if(file->Expired()) {
+        edit.DeleteBlobFile(file->file_number(), db_impl_->GetLatestSequenceNumber());
+      } else if (file->GetDiscardableRatio()>cf_options.blob_file_discardable_ratio) {
+        file->FileStateTransit(BlobFileMeta::FileEvent::kToMerge);
+      }
+    }
   }
-  SubStats(stats_.get(), cf_id, TitanInternalStats::LIVE_BLOB_SIZE, delta);
-  bs->ComputeGCScore();
+  SubStats(stats_.get(), cf_id, TitanInternalStats::LIVE_BLOB_SIZE, size_delta);
+  if(cf_options.level_merge){
+    vset_->LogAndApply(edit);
+  } else {
+    bs->ComputeGCScore();
 
-  AddToGCQueue(cf_id);
-  MaybeScheduleGC();
+    AddToGCQueue(cf_id);
+    MaybeScheduleGC();
+  }
 
   return s;
 }
@@ -935,9 +953,9 @@ void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
   if (ucp_iter == tps.user_collected_properties.end()) {
     return;
   }
-  std::map<uint64_t, uint64_t> blob_files_size;
+  std::map<uint64_t, BlobFileData> blob_files_data;
   Slice src{ucp_iter->second};
-  if (!BlobFileSizeCollector::Decode(&src, &blob_files_size)) {
+  if (!BlobFileSizeCollector::Decode(&src, &blob_files_data)) {
     // TODO: Should treat it as background error and make DB read-only.
     ROCKS_LOG_ERROR(db_options_.info_log,
                     "OnFlushCompleted[%d]: failed to decode table property, "
@@ -945,9 +963,9 @@ void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
                     flush_job_info.job_id, ucp_iter->second.size());
     assert(false);
   }
-  assert(!blob_files_size.empty());
+  assert(!blob_files_data.empty());
   std::set<uint64_t> outputs;
-  for (const auto f : blob_files_size) {
+  for (const auto f : blob_files_data) {
     outputs.insert(f.first);
   }
 
@@ -985,7 +1003,8 @@ void TitanDBImpl::OnCompactionCompleted(
   }
   std::set<uint64_t> outputs;
   std::set<uint64_t> inputs;
-  std::map<uint64_t, BlobFileData> blob_files_data;
+  // difference of valid size and entries
+  std::map<uint64_t, std::pair<int64_t, int64_t>> blob_files_data_diff;
   auto calc_bfs = [&](const std::vector<std::string>& files, int coefficient,
                       bool output) {
     for (const auto& file : files) {
@@ -1026,12 +1045,12 @@ void TitanDBImpl::OnCompactionCompleted(
         } else {
           inputs.insert(input_bfs.first);
         }
-        auto bfs_iter = blob_files_data.find(input_bfs.first);
-        if (bfs_iter == blob_files_data.end()) {
-          blob_files_data[input_bfs.first] = BlobFileData(coefficient * input_bfs.second.blob_files_size_, coefficient * input_bfs.second.blob_files_entries_);
+        auto bfs_iter = blob_files_data_diff.find(input_bfs.first);
+        if (bfs_iter == blob_files_data_diff.end()) {
+          blob_files_data_diff[input_bfs.first] = {coefficient * input_bfs.second.blob_files_size_, coefficient * input_bfs.second.blob_files_entries_};
         } else {
-          bfs_iter->second.blob_files_size_ += coefficient * input_bfs.second.blob_files_size_;
-          bfs_iter->second.blob_files_entries_ += coefficient * input_bfs.second.blob_files_entries_;
+          bfs_iter->second.first += coefficient * input_bfs.second.blob_files_size_;
+          bfs_iter->second.second += coefficient * input_bfs.second.blob_files_entries_;
         }
       }
     }
@@ -1071,9 +1090,10 @@ void TitanDBImpl::OnCompactionCompleted(
 
     uint64_t delta_size = 0;
     uint64_t delta_entries = 0;
-    for (const auto& bfd : blob_files_data) {
+    VersionEdit edit;
+    for (const auto& bfd : blob_files_data_diff) {
       // blob file size < 0 means discardable size > 0
-      if (bfd.second.blob_files_size_ >= 0) {
+      if (bfd.second.first >= 0) {
         continue;
       }
       auto file = bs->FindFile(bfd.first).lock();
@@ -1082,18 +1102,29 @@ void TitanDBImpl::OnCompactionCompleted(
         continue;
       }
       if (!file->is_obsolete()) {
-        delta_size += -bfd.second.blob_files_size_;
-        delta_entries += -bfd.second.blob_files_entries_;
+        delta_size += -bfd.second.first;
+        delta_entries += -bfd.second.second;
       }
-      file->AddDiscardableSize(static_cast<uint64_t>(-bfd.second.blob_files_size_));
-      file->AddDiscardableEntries(static_cast<uint64_t>(-bfd.second.blob_files_entries_));
+      file->AddDiscardableSize(static_cast<uint64_t>(-bfd.second.first));
+      file->AddDiscardableEntries(static_cast<uint64_t>(-bfd.second.second));
+      if(bs->cf_options().level_merge) {
+        if (file->Expired()) {
+          edit.DeleteBlobFile(file->file_number(), db_impl_->GetLatestSequenceNumber());
+        } else if (file->GetDiscardableRatio()>bs->cf_options().blob_file_discardable_ratio) {
+          file->FileStateTransit(BlobFileMeta::FileEvent::kToMerge);
+        }
+      }
     }
     SubStats(stats_.get(), compaction_job_info.cf_id,
              TitanInternalStats::LIVE_BLOB_SIZE, delta_size);
-    bs->ComputeGCScore();
+    if(bs->cf_options().level_merge) {
+      vset_->LogAndApply(edit);
+    } else {
+      bs->ComputeGCScore();
 
-    AddToGCQueue(compaction_job_info.cf_id);
-    MaybeScheduleGC();
+      AddToGCQueue(compaction_job_info.cf_id);
+      MaybeScheduleGC();
+    }
   }
 }
 
