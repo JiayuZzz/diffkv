@@ -92,7 +92,6 @@ class BlobGCJobTest : public testing::Test {
     compact_opts.change_level = true;
     compact_opts.target_level = opts.num_levels - 1;
     compact_opts.bottommost_level_compaction = BottommostLevelCompaction::kSkip;
-    std::cout<<"do compaction target level "<<compact_opts.target_level<<std::endl;
     ASSERT_OK(db_->CompactRange(compact_opts, nullptr, nullptr));
   }
 
@@ -266,7 +265,7 @@ class BlobGCJobTest : public testing::Test {
     std::vector<std::string> to_compact;
     auto opts = db_->GetOptions();
 
-    for (int i=0;i<10;i++){
+    for (int i = 0; i < 10; i++) {
       db_->Put(WriteOptions(), GenKey(i), GenValue(i));
     }
     Flush();
@@ -275,11 +274,12 @@ class BlobGCJobTest : public testing::Test {
     // compact level0 file to last level
     db_->GetColumnFamilyMetaData(base_db_->DefaultColumnFamily(), &cf_meta);
     to_compact.push_back(cf_meta.levels[0].files[0].name);
-    db_->CompactFiles(CompactionOptions(), base_db_->DefaultColumnFamily(), to_compact, opts.num_levels-1);
+    db_->CompactFiles(CompactionOptions(), base_db_->DefaultColumnFamily(),
+                      to_compact, opts.num_levels - 1);
     CheckBlobNumber(2);
 
     // update most of keys
-    for (int i=1;i<11;i++){
+    for (int i = 1; i < 11; i++) {
       db_->Put(WriteOptions(), GenKey(i), GenValue(i));
     }
     Flush();
@@ -288,15 +288,22 @@ class BlobGCJobTest : public testing::Test {
     // compact new level0 file to last level
     db_->GetColumnFamilyMetaData(base_db_->DefaultColumnFamily(), &cf_meta);
     to_compact[0] = cf_meta.levels[0].files[0].name;
-    db_->CompactFiles(CompactionOptions(), base_db_->DefaultColumnFamily(), to_compact, opts.num_levels-1);
+    db_->CompactFiles(CompactionOptions(), base_db_->DefaultColumnFamily(),
+                      to_compact, opts.num_levels - 1);
     CheckBlobNumber(4);
 
     auto b = GetBlobStorage(base_db_->DefaultColumnFamily()->GetID()).lock();
-    // blob file number is start from 2, they are: old level0 blob file, old last level blob file, new level0 blob file, new last level blob file respectively.
-    ASSERT_EQ(b->FindFile(2).lock()->file_state(), BlobFileMeta::FileState::kObsolete);
-    ASSERT_EQ(b->FindFile(3).lock()->file_state(), BlobFileMeta::FileState::kNeedMerge);
-    ASSERT_EQ(b->FindFile(4).lock()->file_state(), BlobFileMeta::FileState::kObsolete);
-    ASSERT_EQ(b->FindFile(5).lock()->file_state(), BlobFileMeta::FileState::kNormal);
+    // blob file number is start from 2, they are: old level0 blob file, old
+    // last level blob file, new level0 blob file, new last level blob file
+    // respectively.
+    ASSERT_EQ(b->FindFile(2).lock()->file_state(),
+              BlobFileMeta::FileState::kObsolete);
+    ASSERT_EQ(b->FindFile(3).lock()->file_state(),
+              BlobFileMeta::FileState::kNeedMerge);
+    ASSERT_EQ(b->FindFile(4).lock()->file_state(),
+              BlobFileMeta::FileState::kObsolete);
+    ASSERT_EQ(b->FindFile(5).lock()->file_state(),
+              BlobFileMeta::FileState::kNormal);
 
     DestroyDB();
   }
@@ -509,9 +516,7 @@ TEST_F(BlobGCJobTest, DeleteFilesInRange) {
   DestroyDB();
 }
 
-TEST_F(BlobGCJobTest, LevelMergeGC) {
-  TestLevelMergeGC();
-}
+TEST_F(BlobGCJobTest, LevelMergeGC) { TestLevelMergeGC(); }
 
 }  // namespace titandb
 }  // namespace rocksdb
