@@ -1826,7 +1826,7 @@ class StressTest {
             size_t random_file_index =
                 thread->rand.Uniform(static_cast<int>(files.size()));
             if (files[random_file_index].being_compacted) {
-              // Retry as the selected file is currently being compacted
+              // Retry as the selected file is currently being compact ed
               continue;
             }
 

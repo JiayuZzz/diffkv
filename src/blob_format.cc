@@ -202,7 +202,10 @@ void BlobFileMeta::FileStateTransit(const FileEvent& event) {
       state_ = FileState::kObsolete;
       break;
     case FileEvent::kToMerge:
-      assert(state_ != FileState::kObsolete);
+      if (state_ == FileState::kNeedMerge) {
+        break;
+      }
+      assert(state_ == FileState::kNormal);
       state_ = FileState::kNeedMerge;
       break;
     default:
