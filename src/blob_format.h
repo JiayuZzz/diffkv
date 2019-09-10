@@ -163,7 +163,7 @@ class BlobFileMeta {
 
   void AddDiscardableSize(uint64_t _discardable_size);
   void AddDiscardableEntries(uint64_t _discardable_entries);
-  bool Expired() { return discardable_entries_ == file_entries_; }
+  bool Expired() { return file_entries_ > 0 && discardable_entries_ == file_entries_; }
   double GetDiscardableRatio() const;
 
  private:
