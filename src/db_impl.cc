@@ -749,7 +749,7 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
     if (ucp_iter == prop->user_collected_properties.end()) {
       continue;
     }
-    std::map<uint64_t, BlobFileData> sst_blob_files_data;
+    std::map<uint64_t, BlobFileSize> sst_blob_files_data;
     std::string str = ucp_iter->second;
     Slice slice{str};
     if (!BlobFileSizeCollector::Decode(&slice, &sst_blob_files_data)) {
@@ -763,9 +763,9 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
     }
 
     for (auto& it : sst_blob_files_data) {
-      discardable_blob_files_data[it.first].first += it.second.blob_files_size_;
+      discardable_blob_files_data[it.first].first += it.second.size;
       discardable_blob_files_data[it.first].second +=
-          it.second.blob_files_entries_;
+          it.second.entries;
     }
   }
 
@@ -956,9 +956,9 @@ void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
   if (ucp_iter == tps.user_collected_properties.end()) {
     return;
   }
-  std::map<uint64_t, BlobFileData> blob_files_data;
+  std::map<uint64_t, BlobFileSize> blob_files_size;
   Slice src{ucp_iter->second};
-  if (!BlobFileSizeCollector::Decode(&src, &blob_files_data)) {
+  if (!BlobFileSizeCollector::Decode(&src, &blob_files_size)) {
     // TODO: Should treat it as background error and make DB read-only.
     ROCKS_LOG_ERROR(db_options_.info_log,
                     "OnFlushCompleted[%d]: failed to decode table property, "
@@ -966,9 +966,9 @@ void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
                     flush_job_info.job_id, ucp_iter->second.size());
     assert(false);
   }
-  assert(!blob_files_data.empty());
+  assert(!blob_files_size.empty());
   std::set<uint64_t> outputs;
-  for (const auto f : blob_files_data) {
+  for (const auto f : blob_files_size) {
     outputs.insert(f.first);
   }
 
@@ -1027,7 +1027,7 @@ void TitanDBImpl::OnCompactionCompleted(
       if (ucp_iter == tp_iter->second->user_collected_properties.end()) {
         continue;
       }
-      std::map<uint64_t, BlobFileData> input_blob_files_data;
+      std::map<uint64_t, BlobFileSize> input_blob_files_data;
       std::string s = ucp_iter->second;
       Slice slice{s};
       if (!BlobFileSizeCollector::Decode(&slice, &input_blob_files_data)) {
@@ -1051,13 +1051,13 @@ void TitanDBImpl::OnCompactionCompleted(
         auto bfs_iter = blob_files_data_diff.find(input_bfs.first);
         if (bfs_iter == blob_files_data_diff.end()) {
           blob_files_data_diff[input_bfs.first] = {
-              coefficient * input_bfs.second.blob_files_size_,
-              coefficient * input_bfs.second.blob_files_entries_};
+              coefficient * input_bfs.second.size,
+              coefficient * input_bfs.second.entries};
         } else {
           bfs_iter->second.first +=
-              coefficient * input_bfs.second.blob_files_size_;
+              coefficient * input_bfs.second.size;
           bfs_iter->second.second +=
-              coefficient * input_bfs.second.blob_files_entries_;
+              coefficient * input_bfs.second.entries;
         }
       }
     }

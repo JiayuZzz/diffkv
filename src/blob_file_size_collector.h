@@ -19,23 +19,23 @@ class BlobFileSizeCollectorFactory final
   const char* Name() const override { return "BlobFileSizeCollector"; }
 };
 
-struct BlobFileData {
-  uint64_t blob_files_size_;
-  uint64_t blob_files_entries_;
+struct BlobFileSize {
+  uint64_t size;
+  uint64_t entries;
 
-  BlobFileData() = default;
-  BlobFileData(uint64_t s, uint64_t e)
-      : blob_files_size_(s), blob_files_entries_(e) {}
+  BlobFileSize() = default;
+  BlobFileSize(uint64_t s, uint64_t e)
+      : size(s), entries(e) {}
 };
 
 class BlobFileSizeCollector final : public TablePropertiesCollector {
  public:
   const static std::string kPropertiesName;
 
-  static bool Encode(const std::map<uint64_t, BlobFileData>& blob_files_data,
+  static bool Encode(const std::map<uint64_t, BlobFileSize>& blob_files_size,
                      std::string* result);
   static bool Decode(Slice* slice,
-                     std::map<uint64_t, BlobFileData>* blob_files_data);
+                     std::map<uint64_t, BlobFileSize>* blob_files_size);
 
   Status AddUserKey(const Slice& key, const Slice& value, EntryType type,
                     SequenceNumber seq, uint64_t file_size) override;
@@ -46,7 +46,7 @@ class BlobFileSizeCollector final : public TablePropertiesCollector {
   const char* Name() const override { return "BlobFileSizeCollector"; }
 
  private:
-  std::map<uint64_t, BlobFileData> blob_files_data_;
+  std::map<uint64_t, BlobFileSize> blob_files_size_;
 };
 
 }  // namespace titandb
