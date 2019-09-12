@@ -66,9 +66,7 @@ class FileManager : public BlobFileManager {
     return env_->DeleteFile(handle->GetName());
   }
 
-  uint64_t LastBlobNumber() {
-    return number_.load() - 1;
-  }
+  uint64_t LastBlobNumber() { return number_.load() - 1; }
 
  private:
   class FileHandle : public BlobFileHandle {
@@ -118,8 +116,9 @@ class TableBuilderTest : public testing::Test {
   }
 
   ~TableBuilderTest() {
-    uint64_t last_blob_number = reinterpret_cast<FileManager*>(blob_manager_.get())->LastBlobNumber();
-    for (uint64_t i = kTestFileNumber; i<=last_blob_number; i++){
+    uint64_t last_blob_number =
+        reinterpret_cast<FileManager*>(blob_manager_.get())->LastBlobNumber();
+    for (uint64_t i = kTestFileNumber; i <= last_blob_number; i++) {
       env_->DeleteFile(BlobFileName(tmpdir_, i));
     }
     env_->DeleteFile(base_name_);
@@ -166,7 +165,8 @@ class TableBuilderTest : public testing::Test {
                                    result, nullptr));
   }
 
-  void NewTableReader(const std::string& fname, std::unique_ptr<TableReader>* result) {
+  void NewTableReader(const std::string& fname,
+                      std::unique_ptr<TableReader>* result) {
     std::unique_ptr<RandomAccessFileReader> file;
     NewFileReader(fname, &file);
     uint64_t file_size = 0;
@@ -232,7 +232,7 @@ TEST_F(TableBuilderTest, Basic) {
   ASSERT_OK(base_file->Close());
 
   std::unique_ptr<TableReader> base_reader;
-  NewTableReader(base_name_ ,&base_reader);
+  NewTableReader(base_name_, &base_reader);
   std::unique_ptr<BlobFileReader> blob_reader;
   NewBlobFileReader(&blob_reader);
 
@@ -368,8 +368,9 @@ TEST_F(TableBuilderTest, TargetSize) {
     table_builder->Add(ikey.Encode(), value);
   }
   ASSERT_OK(table_builder->Finish());
-  uint64_t last_file_number = reinterpret_cast<FileManager*>(blob_manager_.get())->LastBlobNumber();
-  for (uint64_t i = kTestFileNumber; i<= last_file_number; i++) {
+  uint64_t last_file_number =
+      reinterpret_cast<FileManager*>(blob_manager_.get())->LastBlobNumber();
+  for (uint64_t i = kTestFileNumber; i <= last_file_number; i++) {
     uint64_t file_size = 0;
     ASSERT_OK(env_->GetFileSize(BlobFileName(tmpdir_, i), &file_size));
     ASSERT_TRUE(file_size < kTargetBlobFileSize + 1 + kMinBlobSize);
@@ -379,7 +380,8 @@ TEST_F(TableBuilderTest, TargetSize) {
   }
 }
 
-// Compact a level 0 file to last level, to test level merge is functional and correct
+// Compact a level 0 file to last level, to test level merge is functional and
+// correct
 TEST_F(TableBuilderTest, LevelMerge) {
   cf_options_.level_merge = true;
   table_factory_.reset(new TitanTableFactory(
