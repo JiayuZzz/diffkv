@@ -241,6 +241,7 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
                            {cf_name, ImmutableTitanCFOptions(descs[i].options),
                             MutableTitanCFOptions(descs[i].options),
                             base_table_factory, titan_table_factory}));
+      builders_.emplace(cf_id, ForegroundBuilder(blob_manager_, db_options_, descs[i].options));
       base_descs[i].options.table_factory = titan_table_factory;
       // Add TableProperties for collecting statistics GC
       base_descs[i].options.table_properties_collector_factories.emplace_back(
@@ -489,8 +490,16 @@ Status TitanDBImpl::Put(const rocksdb::WriteOptions& options,
                         rocksdb::ColumnFamilyHandle* column_family,
                         const rocksdb::Slice& key,
                         const rocksdb::Slice& value) {
-  return HasBGError() ? GetBGError()
-                      : db_->Put(options, column_family, key, value);
+  if(HasBGError()) return GetBGError();
+  if (db_options_.sep_before_flush && value.size() > cf_info_[column_family->GetID()].immutable_cf_options.mid_blob_size) {
+    auto wb = WriteBatch();
+    if(builders_[column_family->GetID()].Add(key, value, wb).ok()){
+      return db_->Write(options, &wb);
+    }
+    return db_->Put(options, column_family, key, value);
+  } else {
+      return db_->Put(options, column_family, key, value);
+  }
 }
 
 Status TitanDBImpl::Write(const rocksdb::WriteOptions& options,

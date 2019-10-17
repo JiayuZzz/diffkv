@@ -38,6 +38,8 @@ struct TitanDBOptions : public DBOptions {
   // Default: 600 (10 min)
   uint32_t titan_stats_dump_period_sec{600};
 
+  bool sep_before_flush{false};
+
   TitanDBOptions() = default;
   explicit TitanDBOptions(const DBOptions& options) : DBOptions(options) {}
 
@@ -78,7 +80,10 @@ struct TitanCFOptions : public ColumnFamilyOptions {
   // this threshold will be inlined in base DB.
   //
   // Default: 4096
-  uint64_t min_blob_size{4096};
+  uint64_t min_blob_size{128};
+
+
+  uint64_t mid_blob_size{4096};
 
   // The compression algorithm used to compress data in blob files.
   //
@@ -175,6 +180,7 @@ struct ImmutableTitanCFOptions {
 
   explicit ImmutableTitanCFOptions(const TitanCFOptions& opts)
       : min_blob_size(opts.min_blob_size),
+        mid_blob_size(opts.mid_blob_size),
         blob_file_compression(opts.blob_file_compression),
         blob_file_target_size(opts.blob_file_target_size),
         blob_cache(opts.blob_cache),
@@ -186,6 +192,8 @@ struct ImmutableTitanCFOptions {
         level_merge(opts.level_merge) {}
 
   uint64_t min_blob_size;
+
+  uint64_t mid_blob_size;
 
   CompressionType blob_file_compression;
 

@@ -9,6 +9,8 @@
 #include "table_factory.h"
 #include "titan/db.h"
 #include "titan_stats.h"
+#include "table_builder.h"
+
 
 namespace rocksdb {
 namespace titandb {
@@ -250,6 +252,8 @@ class TitanDBImpl : public TitanDB {
 
   // Access while holding mutex_ lock or during DB open.
   std::unordered_map<uint32_t, TitanColumnFamilyInfo> cf_info_;
+
+  std::unordered_map<uint32_t, ForegroundBuilder> builders_;
 
   // handle for purging obsolete blob files at fixed intervals
   std::unique_ptr<RepeatableThread> thread_purge_obsolete_;

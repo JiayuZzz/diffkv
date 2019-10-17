@@ -79,6 +79,10 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
     if (!ok()) {
       return;
     }
+    if (index.blob_handle.size>=cf_options_.mid_blob_size) {
+      base_builder_->Add(key, value);
+      return;
+    }
     auto storage = blob_storage_.lock();
     assert(storage != nullptr);
     auto blob_file = storage->FindFile(index.file_number).lock();
