@@ -1008,6 +1008,9 @@ bool TitanDBImpl::GetIntProperty(ColumnFamilyHandle* column_family,
 }
 
 void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
+  for(auto& builder:builders_){
+    builder.second.Finish();
+  }
   const auto& tps = flush_job_info.table_properties;
   auto ucp_iter = tps.user_collected_properties.find(
       BlobFileSizeCollector::kPropertiesName);
