@@ -108,7 +108,9 @@ public:
     builders[i]->Add(blob_record, &blob_index.blob_handle);
     if (handles[i]->GetFile()->GetFileSize() >=
       cf_options_.blob_file_target_size) {
-      FinishBlob(i);
+      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this, std::move(handles[i]), std::move(builders[i])));
+      builders[i].reset();
+      handles[i].reset();
     }
     std::string index_entry;
     blob_index.EncodeTo(&index_entry);
@@ -118,32 +120,11 @@ public:
   }
 
   void Finish() {
-    FinishBlob(0);
-    FinishBlob(1);
+    FinishBlob(std::move(handles[0]), std::move(builders[0]));
+    FinishBlob(std::move(handles[1]), std::move(builders[1]));
+    for(auto& t:pool) t.join();
   }
 
-  // Status Finish() {
-    // Status s;
-    // std::vector<std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>> files;
-    // for (int i = 0; i <= 1; i++) {
-      // if (!builders[i] && !handles[i])
-        // continue;
-      // s = builders[i]->Finish();
-      // if (!s.ok())
-        // return s;
-      // auto file = std::make_shared<BlobFileMeta>(handles[i]->GetNumber(),
-                                                //  handles[i]->GetFile()->GetFileSize(),
-                                                //  builders[i]->NumEntries(),
-                                                //  0, builders[i]->GetSmallestKey(),
-                                                //  builders[i]->GetLargestKey());
-      // files.emplace_back(std::make_pair(file, std::move(handles[i])));
-    // }
-    // if(!files.empty()){
-      // s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
-    // }
-    // ResetBuilder();
-    // return s;
-  // }
   ForegroundBuilder(uint32_t cf_id ,std::shared_ptr<BlobFileManager> blob_file_manager, const TitanDBOptions &db_options,
                     const TitanCFOptions &cf_options)
       : cf_id_(cf_id), blob_file_manager_(blob_file_manager), db_options_(db_options), cf_options_(cf_options) {
@@ -159,6 +140,7 @@ private:
   std::shared_ptr<BlobFileManager> blob_file_manager_;
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
+  std::vector<std::thread> pool;
 
   void ResetBuilder() {
     handles[0].reset();
@@ -167,23 +149,21 @@ private:
     builders[1].reset();
   }
 
-  Status FinishBlob(int i) {
+  Status FinishBlob(std::unique_ptr<BlobFileHandle>&& handle, std::unique_ptr<BlobFileBuilder>&& builder) {
     Status s;
     std::vector<std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>> files;
-    if (!builders[i] && !handles[i])
+    if (!builder && !handle)
       return s;
-    s = builders[i]->Finish();
+    s = builder->Finish();
     if(s.ok()){
-      auto file = std::make_shared<BlobFileMeta>(handles[i]->GetNumber(),
-                                                handles[i]->GetFile()->GetFileSize(),
-                                                builders[i]->NumEntries(),
-                                                0, builders[i]->GetSmallestKey(),
-                                                builders[i]->GetLargestKey());
-      files.emplace_back(std::make_pair(file, std::move(handles[i])));
+      auto file = std::make_shared<BlobFileMeta>(handle->GetNumber(),
+                                                handle->GetFile()->GetFileSize(),
+                                                builder->NumEntries(),
+                                                0, builder->GetSmallestKey(),
+                                                builder->GetLargestKey());
+      files.emplace_back(std::make_pair(file, std::move(handle)));
       s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
     }
-    builders[i].reset();
-    handles[i].reset();
     return s;
   }
 };
