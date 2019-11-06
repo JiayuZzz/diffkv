@@ -91,6 +91,14 @@ class BlobGCJobTest : public testing::Test {
     Open();
   }
 
+  void ScheduleRangeMerge(
+      const std::vector<std::shared_ptr<BlobFileMeta>>& files,
+      int max_sorted_runs) {
+    tdb_->mutex_.Lock();
+    tdb_->MarkFileIfNeedMerge(files, max_sorted_runs);
+    tdb_->mutex_.Unlock();
+  }
+
   void Flush() {
     FlushOptions fopts;
     fopts.wait = true;
@@ -465,6 +473,9 @@ TEST_F(BlobGCJobTest, DeleteFilesInRange) {
   Flush();
   CompactAll();
   std::string value;
+  // Now the LSM structure is:
+  // L6: [2, 4]
+  // with 1 alive blob file
   ASSERT_TRUE(db_->GetProperty("rocksdb.num-files-at-level0", &value));
   ASSERT_EQ(value, "0");
   ASSERT_TRUE(db_->GetProperty("rocksdb.num-files-at-level6", &value));
@@ -489,6 +500,10 @@ TEST_F(BlobGCJobTest, DeleteFilesInRange) {
   ASSERT_OK(sst_file_writer.Put(GenKey(2), GenValue(22)));
   ASSERT_OK(sst_file_writer.Finish());
   ASSERT_OK(db_->IngestExternalFile({sst_file}, IngestExternalFileOptions()));
+  // Now the LSM structure is:
+  // L5: [1, 2]
+  // L6: [2, 4]
+  // with 1 alive blob file
   ASSERT_TRUE(db_->GetProperty("rocksdb.num-files-at-level0", &value));
   ASSERT_EQ(value, "0");
   ASSERT_TRUE(db_->GetProperty("rocksdb.num-files-at-level5", &value));
@@ -496,6 +511,11 @@ TEST_F(BlobGCJobTest, DeleteFilesInRange) {
   ASSERT_TRUE(db_->GetProperty("rocksdb.num-files-at-level6", &value));
   ASSERT_EQ(value, "1");
 
+  // GC and purge blob file
+  // Now the LSM structure is:
+  // L5: [1, 2]
+  // L6: [2, 4]
+  // with 0 blob file
   CheckBlobNumber(1);
 
   RunGC(true);
@@ -506,15 +526,21 @@ TEST_F(BlobGCJobTest, DeleteFilesInRange) {
   Slice end = Slice(key3);
   ASSERT_OK(
       DeleteFilesInRange(base_db_, db_->DefaultColumnFamily(), &start, &end));
+  // Now the LSM structure is:
+  // L6: [2, 4]
+  // with 0 blob file
+
   TitanReadOptions opts;
   auto* iter = db_->NewIterator(opts, db_->DefaultColumnFamily());
   iter->SeekToFirst();
   while (iter->Valid()) {
     iter->Next();
   }
+  // `DeleteFilesInRange` may expose old blob index.
   ASSERT_TRUE(iter->status().IsCorruption());
   delete iter;
 
+  // Set key only to ignore the stale blob indexes.
   opts.key_only = true;
   iter = db_->NewIterator(opts, db_->DefaultColumnFamily());
   iter->SeekToFirst();
@@ -576,6 +602,77 @@ TEST_F(BlobGCJobTest, LevelMergeGC) {
             BlobFileMeta::FileState::kObsolete);
   ASSERT_EQ(b->FindFile(5).lock()->file_state(),
             BlobFileMeta::FileState::kNormal);
+
+  DestroyDB();
+}
+
+TEST_F(BlobGCJobTest, RangeMergeScheduler) {
+  NewDB();
+  int max_sorted_run = 1;
+  std::vector<std::shared_ptr<BlobFileMeta>> files;
+  auto add_file = [&](int file_num, const std::string& smallest,
+                      const std::string& largest) {
+    auto file =
+        std::make_shared<BlobFileMeta>(file_num, 0, 0, 0, smallest, largest);
+    file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
+    files.emplace_back(file);
+  };
+
+  // one sorted run, no file will be marked
+  // run 1: [a, b] [c, d] [e, f] [g, h] [i, j] [k, l]
+  for (size_t i = 0; i <= 5; i++) {
+    add_file(i, std::string(1, 'a' + i * 2), std::string(1, 'a' + i * 2 + 1));
+  }
+  ScheduleRangeMerge(files, max_sorted_run);
+  for (const auto& file : files) {
+    ASSERT_EQ(file->file_state(), BlobFileMeta::FileState::kNormal);
+  }
+
+  // run 1: [a, b] [c, d] [e, f] [g, h] [i, j] [k, l]
+  // run 2:               [e, f] [g, h]
+  // files overlaped with [e, h] will be marked
+  add_file(6, "e", "f");
+  add_file(7, "g", "h");
+  ScheduleRangeMerge(files, max_sorted_run);
+  for (size_t i = 0; i < files.size(); i++) {
+    if (i == 2 || i == 3 || i == 6 || i == 7) {
+      ASSERT_EQ(files[i]->file_state(), BlobFileMeta::FileState::kToMerge);
+      files[i]->FileStateTransit(BlobFileMeta::FileEvent::kReset);
+    } else {
+      ASSERT_EQ(files[i]->file_state(), BlobFileMeta::FileState::kNormal);
+    }
+  }
+
+  // run 1: [a, b] [c, d] [e, f] [g, h] [i, j] [k, l]
+  // run 2: [a, b]        [e, f] [g, h]            [l, m]
+  // files overlaped with [a, b] and [e, h] will be marked
+  add_file(8, "a", "b");
+  add_file(9, "l", "m");
+  ScheduleRangeMerge(files, max_sorted_run);
+  for (size_t i = 0; i < files.size(); i++) {
+    if (i == 1 || i == 4 || i == 5 || i == 9) {
+      ASSERT_EQ(files[i]->file_state(), BlobFileMeta::FileState::kNormal);
+    } else {
+      ASSERT_EQ(files[i]->file_state(), BlobFileMeta::FileState::kToMerge);
+      files[i]->FileStateTransit(BlobFileMeta::FileEvent::kReset);
+    }
+  }
+
+  max_sorted_run = 2;
+  // run 1: [a, b] [c, d] [e, f] [g, h] [i, j] [k, l]
+  // run 2: [a, b]        [e, f] [g, h]            [l, m]
+  // run 3: [a,                                      l1]
+  // files overlaped with [a, b] and [e, h] will be marked.
+  add_file(10, "a", "l1");
+  ScheduleRangeMerge(files, max_sorted_run);
+  for (size_t i = 0; i < files.size(); i++) {
+    if (i == 1 || i == 4 || i == 5 || i == 9) {
+      ASSERT_EQ(files[i]->file_state(), BlobFileMeta::FileState::kNormal);
+    } else {
+      ASSERT_EQ(files[i]->file_state(), BlobFileMeta::FileState::kToMerge);
+      files[i]->FileStateTransit(BlobFileMeta::FileEvent::kReset);
+    }
+  }
 
   DestroyDB();
 }

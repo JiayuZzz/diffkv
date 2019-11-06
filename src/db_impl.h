@@ -189,7 +189,7 @@ class TitanDBImpl : public TitanDB {
 
   static void BGWorkGC(void* db);
   void BackgroundCallGC();
-  Status BackgroundGC(LogBuffer* log_buffer);
+  Status BackgroundGC(LogBuffer* log_buffer, uint32_t column_family_id);
 
   void PurgeObsoleteFiles();
   Status PurgeObsoleteFilesImpl();
@@ -218,7 +218,9 @@ class TitanDBImpl : public TitanDB {
     return bg_error_;
   }
 
-  int CountSortedRuns(const std::vector<std::shared_ptr<BlobFileMeta>>& files);
+  void MarkFileIfNeedMerge(
+      const std::vector<std::shared_ptr<BlobFileMeta>>& files,
+      int max_sorted_runs);
 
   bool HasBGError() { return has_bg_error_.load(); }
 
