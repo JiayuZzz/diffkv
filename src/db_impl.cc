@@ -145,6 +145,7 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
 
 TitanDBImpl::~TitanDBImpl() {
   for (auto& builder : builders_) builder.second.Finish();
+  PurgeObsoleteFiles();
   Close();
 }
 
