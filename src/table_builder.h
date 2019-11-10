@@ -7,6 +7,8 @@
 #include "titan/options.h"
 #include "titan_stats.h"
 #include "iostream"
+#include "mutex"
+#include "vector"
 
 namespace rocksdb {
 namespace titandb {
@@ -92,6 +94,7 @@ public:
     if(value.size() < cf_options_.min_blob_size) return Status::InvalidArgument();
     Status s;
     int i = value.size() >= cf_options_.mid_blob_size ? 1 : 0;
+    mutex_[i].lock();
     if (!handles[i] && !builders[i]) {
       s = blob_file_manager_->NewFile(&handles[i]);
       if (!s.ok())
@@ -112,6 +115,7 @@ public:
       builders[i].reset();
       handles[i].reset();
     }
+    mutex_[i].unlock();
     std::string index_entry;
     blob_index.EncodeTo(&index_entry);
 
@@ -141,6 +145,7 @@ private:
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
   std::vector<std::thread> pool;
+  std::vector<std::mutex> mutex_{2};
 
   void ResetBuilder() {
     handles[0].reset();
