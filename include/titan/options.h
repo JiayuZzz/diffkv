@@ -82,7 +82,6 @@ struct TitanCFOptions : public ColumnFamilyOptions {
   // Default: 4096
   uint64_t min_blob_size{128};
 
-
   uint64_t mid_blob_size{4096};
 
   // The compression algorithm used to compress data in blob files.

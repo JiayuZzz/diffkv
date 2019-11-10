@@ -16,9 +16,9 @@
 #include "blob_file_size_collector.h"
 #include "blob_gc.h"
 #include "db_iter.h"
+#include "iostream"
 #include "table_factory.h"
 #include "titan_build_version.h"
-#include "iostream"
 
 namespace rocksdb {
 namespace titandb {
@@ -144,8 +144,8 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
 }
 
 TitanDBImpl::~TitanDBImpl() {
-  for(auto& builder:builders_) builder.second.Finish();
-  Close(); 
+  for (auto& builder : builders_) builder.second.Finish();
+  Close();
 }
 
 void TitanDBImpl::StartBackgroundTasks() {
@@ -247,7 +247,9 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
                            {cf_name, ImmutableTitanCFOptions(descs[i].options),
                             MutableTitanCFOptions(descs[i].options),
                             base_table_factory, titan_table_factory}));
-      builders_.emplace(cf_id, ForegroundBuilder(cf_id, blob_manager_, db_options_, descs[i].options));
+      builders_.emplace(cf_id,
+                        ForegroundBuilder(cf_id, blob_manager_, db_options_,
+                                          descs[i].options));
       base_descs[i].options.table_factory = titan_table_factory;
       // Add TableProperties for collecting statistics GC
       base_descs[i].options.table_properties_collector_factories.emplace_back(
@@ -496,16 +498,17 @@ Status TitanDBImpl::Put(const rocksdb::WriteOptions& options,
                         rocksdb::ColumnFamilyHandle* column_family,
                         const rocksdb::Slice& key,
                         const rocksdb::Slice& value) {
-  if(HasBGError()) return GetBGError();
-  // if (db_options_.sep_before_flush && value.size() > cf_info_[column_family->GetID()].immutable_cf_options.mid_blob_size) {
-    if (db_options_.sep_before_flush){
+  if (HasBGError()) return GetBGError();
+  // if (db_options_.sep_before_flush && value.size() >
+  // cf_info_[column_family->GetID()].immutable_cf_options.mid_blob_size) {
+  if (db_options_.sep_before_flush) {
     auto wb = WriteBatch();
-    if(builders_[column_family->GetID()].Add(key, value, wb).ok()){
+    if (builders_[column_family->GetID()].Add(key, value, wb).ok()) {
       return db_->Write(options, &wb);
     }
     return db_->Put(options, column_family, key, value);
   } else {
-      return db_->Put(options, column_family, key, value);
+    return db_->Put(options, column_family, key, value);
   }
 }
 
@@ -1032,8 +1035,8 @@ bool TitanDBImpl::GetIntProperty(ColumnFamilyHandle* column_family,
 }
 
 void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
-  if(db_options_.sep_before_flush){
-    for(auto& builder:builders_){
+  if (db_options_.sep_before_flush) {
+    for (auto& builder : builders_) {
       builder->Finish();
     }
   }

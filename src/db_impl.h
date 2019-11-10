@@ -6,11 +6,10 @@
 
 #include "blob_file_manager.h"
 #include "blob_file_set.h"
+#include "table_builder.h"
 #include "table_factory.h"
 #include "titan/db.h"
 #include "titan_stats.h"
-#include "table_builder.h"
-
 
 namespace rocksdb {
 namespace titandb {
