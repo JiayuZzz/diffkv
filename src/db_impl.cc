@@ -1038,7 +1038,7 @@ bool TitanDBImpl::GetIntProperty(ColumnFamilyHandle* column_family,
 void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
   if (db_options_.sep_before_flush) {
     for (auto& builder : builders_) {
-      builder->Finish();
+      builder.second.Finish();
     }
   }
   const auto& tps = flush_job_info.table_properties;

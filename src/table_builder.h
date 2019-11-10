@@ -149,6 +149,7 @@ class ForegroundBuilder {
       mutex_[i].unlock();
     }
     for (auto &t : pool) t.join();
+    pool.clear();
   }
 
   ForegroundBuilder(uint32_t cf_id,
@@ -185,6 +186,8 @@ class ForegroundBuilder {
       discardable_[i] = 0;
       mutex_[i].unlock();
     }
+    for (auto &t : pool) t.join();
+      pool.clear();
   }
 
   Status FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
