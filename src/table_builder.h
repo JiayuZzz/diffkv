@@ -136,11 +136,13 @@ public:
 
   void Finish() {
     for(int i=0;i<2;i++){
+    mutex_[i].lock();
     pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this, std::move(handles[i]), std::move(builders[i]), discardable_[i]));
     builders[i].reset();
     handles[i].reset();
     keys_[i].clear();
     discardable_[i] = 0;
+    mutex_[i].unlock();
     }
     for(auto& t:pool) t.join();
   }
