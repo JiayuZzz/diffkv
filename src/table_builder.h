@@ -9,6 +9,7 @@
 #include "iostream"
 #include "mutex"
 #include "vector"
+#include "unordered_map"
 
 namespace rocksdb {
 namespace titandb {
@@ -109,11 +110,21 @@ public:
     BlobIndex blob_index;
     blob_index.file_number = handles[i]->GetNumber();
     builders[i]->Add(blob_record, &blob_index.blob_handle);
+    std::string k = key.ToString();
+    auto iter = keys_[i].find(k);
+    if(iter==keys_[i].end()) {
+      keys_[i][k] = blob_index.blob_handle.size;
+    } else {
+      discardable_[i]+=iter->second;
+      iter->second = blob_index.blob_handle.size;
+    }
     if (handles[i]->GetFile()->GetFileSize() >=
       cf_options_.blob_file_target_size) {
-      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this, std::move(handles[i]), std::move(builders[i])));
+      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this, std::move(handles[i]), std::move(builders[i]), discardable_[i]));
       builders[i].reset();
       handles[i].reset();
+      keys_[i].clear();
+      discardable_[i] = 0;
     }
     mutex_[i].unlock();
     std::string index_entry;
@@ -124,8 +135,13 @@ public:
   }
 
   void Finish() {
-    FinishBlob(std::move(handles[0]), std::move(builders[0]));
-    FinishBlob(std::move(handles[1]), std::move(builders[1]));
+    for(int i=0;i<2;i++){
+    pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this, std::move(handles[i]), std::move(builders[i]), discardable_[i]));
+    builders[i].reset();
+    handles[i].reset();
+    keys_[i].clear();
+    discardable_[i] = 0;
+    }
     for(auto& t:pool) t.join();
   }
 
@@ -146,6 +162,8 @@ private:
   TitanCFOptions cf_options_;
   std::vector<std::thread> pool;
   std::vector<std::mutex> mutex_{2};
+  std::vector<std::unordered_map<std::string, uint64_t>> keys_{2};
+  std::vector<uint64_t> discardable_{2, 0};
 
   void ResetBuilder() {
     handles[0].reset();
@@ -154,7 +172,7 @@ private:
     builders[1].reset();
   }
 
-  Status FinishBlob(std::unique_ptr<BlobFileHandle>&& handle, std::unique_ptr<BlobFileBuilder>&& builder) {
+  Status FinishBlob(std::unique_ptr<BlobFileHandle>&& handle, std::unique_ptr<BlobFileBuilder>&& builder, uint64_t discardable) {
     Status s;
     std::vector<std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>> files;
     if (!builder && !handle)
@@ -166,6 +184,7 @@ private:
                                                 builder->NumEntries(),
                                                 0, builder->GetSmallestKey(),
                                                 builder->GetLargestKey());
+      file->AddDiscardableSize(discardable);
       files.emplace_back(std::make_pair(file, std::move(handle)));
       s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
     }
