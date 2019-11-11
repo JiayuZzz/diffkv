@@ -211,7 +211,7 @@ class BlobFileMeta {
 
   FileState file_state() const { return state_; }
   bool is_obsolete() const { return state_ == FileState::kObsolete; }
-  uint32_t file_type() const { return file_type_;}
+  uint32_t file_type() const { return file_type_; }
   uint64_t discardable_size() const { return discardable_size_; }
 
   bool gc_mark() const { return gc_mark_; }

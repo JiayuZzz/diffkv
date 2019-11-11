@@ -3,8 +3,8 @@
 #endif
 #include <inttypes.h>
 
-#include <memory>
 #include <atomic>
+#include <memory>
 
 #include "blob_gc_job.h"
 #include "iostream"
@@ -494,11 +494,11 @@ Status BlobGCJob::InstallOutputBlobFiles() {
         files;
     std::string tmp;
     for (auto& builder : blob_file_builders_) {
-      uint32_t type = db_options_.sep_before_flush?kUnSorted:kSorted;
+      uint32_t type = db_options_.sep_before_flush ? kUnSorted : kSorted;
       auto file = std::make_shared<BlobFileMeta>(
           builder.first->GetNumber(), builder.first->GetFile()->GetFileSize(),
           0, 0, builder.second->GetSmallestKey(),
-          builder.second->GetLargestKey(),type);
+          builder.second->GetLargestKey(), type);
       file->FileStateTransit(BlobFileMeta::FileEvent::kGCOutput);
       RecordInHistogram(stats_, TitanStats::GC_OUTPUT_FILE_SIZE,
                         file->file_size());
@@ -507,7 +507,7 @@ Status BlobGCJob::InstallOutputBlobFiles() {
       }
       tmp.append(std::to_string(file->file_number()));
       files.emplace_back(std::make_pair(file, std::move(builder.first)));
-      std::cerr<<"gc output file"<<std::endl;
+      std::cerr << "gc output file" << std::endl;
     }
     ROCKS_LOG_BUFFER(log_buffer_, "[%s] output[%s]",
                      blob_gc_->column_family_handle()->GetName().c_str(),

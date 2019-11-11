@@ -116,7 +116,6 @@ struct TitanCFOptions : public ColumnFamilyOptions {
 
   double high_level_blob_discardable_ratio{0.7};
 
-
   // The ratio of how much size of a blob file need to be sample before GC.
   //
   // Default: 0.1

@@ -10,7 +10,6 @@
 #include "titan_stats.h"
 #include "unordered_map"
 #include "vector"
-#include "iostream"
 
 namespace rocksdb {
 namespace titandb {
@@ -32,8 +31,7 @@ class TitanTableBuilder : public TableBuilder {
         stats_(stats),
         target_level_(target_level),
         merge_level_(merge_level),
-        start_level_(start_level) {
-        }
+        start_level_(start_level) {}
 
   void Add(const Slice &key, const Slice &value) override;
 
@@ -99,10 +97,20 @@ class TitanTableBuilder : public TableBuilder {
 class ForegroundBuilder {
  public:
   Status Add(const Slice &key, const Slice &value, WriteBatch &wb) {
-    if (value.size() < cf_options_.min_blob_size || (cf_options_.level_merge&&value.size()<cf_options_.mid_blob_size))
-      return Status::InvalidArgument();
-    Status s;
     mutex_[0].lock();
+    std::string k = key.ToString();
+    if (value.size() < cf_options_.min_blob_size ||
+        (cf_options_.level_merge && value.size() < cf_options_.mid_blob_size)) {
+      auto iter = keys_.find(k);
+      if (iter == keys_.end()) {
+      } else {
+        discardable_ += iter->second;
+        keys_.erase(iter);
+      }
+      mutex_[0].unlock();
+      return Status::InvalidArgument();
+    }
+    Status s;
     if (!handle_ && !builder_) {
       s = blob_file_manager_->NewFile(&handle_);
       if (!s.ok()) return s;
@@ -115,7 +123,6 @@ class ForegroundBuilder {
     BlobIndex blob_index;
     blob_index.file_number = handle_->GetNumber();
     builder_->Add(blob_record, &blob_index.blob_handle);
-    std::string k = key.ToString();
     auto iter = keys_.find(k);
     if (iter == keys_.end()) {
       keys_[k] = blob_index.blob_handle.size;
@@ -144,18 +151,18 @@ class ForegroundBuilder {
 
   void Finish() {
     std::vector<std::thread> p(2);
-      mutex_[0].lock();
-      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
-                                 std::move(handle_), std::move(builder_),
-                                 discardable_));
-      builder_.reset();
-      handle_.reset();
-      keys_.clear();
-      discardable_ = 0;
-      p = std::move(pool);
-      pool = std::vector<std::thread>();
-      mutex_[0].unlock();
-      for(auto& t:p) t.join();
+    mutex_[0].lock();
+    pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+                               std::move(handle_), std::move(builder_),
+                               discardable_));
+    builder_.reset();
+    handle_.reset();
+    keys_.clear();
+    discardable_ = 0;
+    p = std::move(pool);
+    pool = std::vector<std::thread>();
+    mutex_[0].unlock();
+    for (auto &t : p) t.join();
   }
 
   ForegroundBuilder(uint32_t cf_id,
@@ -184,14 +191,14 @@ class ForegroundBuilder {
   uint64_t discardable_{0};
 
   void ResetBuilder() {
-      mutex_[0].lock();
-      handle_.reset();
-      builder_.reset();
-      keys_.clear();
-      discardable_ = 0;
-      for (auto &t : pool) t.join();
-      pool.clear();
-      mutex_[0].unlock();
+    mutex_[0].lock();
+    handle_.reset();
+    builder_.reset();
+    keys_.clear();
+    discardable_ = 0;
+    for (auto &t : pool) t.join();
+    pool.clear();
+    mutex_[0].unlock();
   }
 
   Status FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,

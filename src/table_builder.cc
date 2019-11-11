@@ -5,20 +5,17 @@
 #endif
 
 #include <inttypes.h>
+#include <atomic>
 #include <iostream>
 #include "monitoring/statistics.h"
-#include <atomic>
 
 std::atomic<uint64_t> blob_merge_time{0};
 rocksdb::Env* env_ = rocksdb::Env::Default();
 
-
 namespace rocksdb {
 namespace titandb {
 
-TitanTableBuilder::~TitanTableBuilder(){
-  blob_merge_time += blob_merge_time_;
-}
+TitanTableBuilder::~TitanTableBuilder() { blob_merge_time += blob_merge_time_; }
 
 void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
   if (!ok()) return;
@@ -79,8 +76,8 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
       AppendInternalKey(&index_key, ikey);
       base_builder_->Add(index_key, index_value);
     }
-  } else if (ikey.type == kTypeBlobIndex && cf_options_.level_merge && start_level_!=0 &&
-             target_level_ >= merge_level_ &&
+  } else if (ikey.type == kTypeBlobIndex && cf_options_.level_merge &&
+             start_level_ != 0 && target_level_ >= merge_level_ &&
              cf_options_.blob_run_mode == TitanBlobRunMode::kNormal) {
     // we merge value to new blob file
     BlobIndex index;
@@ -89,9 +86,8 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
     if (!ok()) {
       return;
     }
-    // if (db_options_.sep_before_flush && index.blob_handle.size >= cf_options_.mid_blob_size) {
-      // base_builder_->Add(key, value);
-      // return;
+    // if (db_options_.sep_before_flush && index.blob_handle.size >=
+    // cf_options_.mid_blob_size) { base_builder_->Add(key, value); return;
     // }
     auto storage = blob_storage_.lock();
     assert(storage != nullptr);
@@ -103,8 +99,8 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
       if (s.ok()) {
         std::string index_value;
         {
-        TitanStopWatch sw(env_, blob_merge_time_);
-        AddBlob(ikey.user_key, record.value, &index_value);
+          TitanStopWatch sw(env_, blob_merge_time_);
+          AddBlob(ikey.user_key, record.value, &index_value);
         }
         if (ok()) {
           std::string index_key;
@@ -169,7 +165,8 @@ void TitanTableBuilder::FinishBlobFile() {
       std::shared_ptr<BlobFileMeta> file = std::make_shared<BlobFileMeta>(
           blob_handle_->GetNumber(), blob_handle_->GetFile()->GetFileSize(),
           blob_builder_->NumEntries(), target_level_,
-          blob_builder_->GetSmallestKey(), blob_builder_->GetLargestKey(), kSorted);
+          blob_builder_->GetSmallestKey(), blob_builder_->GetLargestKey(),
+          kSorted);
       file->FileStateTransit(BlobFileMeta::FileEvent::kFlushOrCompactionOutput);
       finished_blobs_.push_back({file, std::move(blob_handle_)});
       blob_builder_.reset();
@@ -242,7 +239,7 @@ bool TitanTableBuilder::ShouldMerge(
   // 1. Corresponding keys are being compacted to last two level from lower
   // level
   // 2. Blob file is marked by GC or range merge
-  return file != nullptr && file->file_type()==kSorted &&
+  return file != nullptr && file->file_type() == kSorted &&
          (static_cast<int>(file->file_level()) < target_level_ ||
           file->file_state() == BlobFileMeta::FileState::kToMerge);
 }

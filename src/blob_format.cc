@@ -151,7 +151,8 @@ Status BlobFileMeta::DecodeFromLegacy(Slice* src) {
 
 Status BlobFileMeta::DecodeFrom(Slice* src) {
   if (!GetVarint64(src, &file_number_) || !GetVarint64(src, &file_size_) ||
-      !GetVarint64(src, &file_entries_) || !GetVarint32(src, &file_type_) || !GetVarint32(src, &file_level_)) {
+      !GetVarint64(src, &file_entries_) || !GetVarint32(src, &file_type_) ||
+      !GetVarint32(src, &file_level_)) {
     return Status::Corruption("BlobFileMeta decode failed");
   }
   Slice str;

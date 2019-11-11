@@ -2,13 +2,12 @@
 
 #include "test_util/sync_point.h"
 
+#include "atomic"
 #include "blob_file_iterator.h"
 #include "blob_gc_job.h"
 #include "blob_gc_picker.h"
-#include "atomic"
 
 std::atomic<uint64_t> gc_total{0};
-
 
 namespace rocksdb {
 namespace titandb {
@@ -83,73 +82,73 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
   std::unique_ptr<ColumnFamilyHandle> cfh;
   Status s;
   {
-  TitanStopWatch(env_, gc_time);
-  std::shared_ptr<BlobStorage> blob_storage;
-  // Skip CFs that have been dropped.
-  if (!blob_file_set_->IsColumnFamilyObsolete(column_family_id)) {
-    blob_storage = blob_file_set_->GetBlobStorage(column_family_id).lock();
-  } else {
-    TEST_SYNC_POINT_CALLBACK("TitanDBImpl::BackgroundGC:CFDropped", nullptr);
-    ROCKS_LOG_BUFFER(log_buffer, "GC skip dropped colum family [%s].",
-                     cf_info_[column_family_id].name.c_str());
-  }
-  if (blob_storage != nullptr) {
-    const auto& cf_options = blob_storage->cf_options();
-    std::shared_ptr<BlobGCPicker> blob_gc_picker =
-        std::make_shared<BasicBlobGCPicker>(db_options_, cf_options,
-                                            stats_.get());
-    blob_gc = blob_gc_picker->PickBlobGC(blob_storage.get());
-
-    if (blob_gc) {
-      cfh = db_impl_->GetColumnFamilyHandleUnlocked(column_family_id);
-      assert(column_family_id == cfh->GetID());
-      blob_gc->SetColumnFamily(cfh.get());
+    TitanStopWatch(env_, gc_time);
+    std::shared_ptr<BlobStorage> blob_storage;
+    // Skip CFs that have been dropped.
+    if (!blob_file_set_->IsColumnFamilyObsolete(column_family_id)) {
+      blob_storage = blob_file_set_->GetBlobStorage(column_family_id).lock();
+    } else {
+      TEST_SYNC_POINT_CALLBACK("TitanDBImpl::BackgroundGC:CFDropped", nullptr);
+      ROCKS_LOG_BUFFER(log_buffer, "GC skip dropped colum family [%s].",
+                       cf_info_[column_family_id].name.c_str());
     }
-  }
+    if (blob_storage != nullptr) {
+      const auto& cf_options = blob_storage->cf_options();
+      std::shared_ptr<BlobGCPicker> blob_gc_picker =
+          std::make_shared<BasicBlobGCPicker>(db_options_, cf_options,
+                                              stats_.get());
+      blob_gc = blob_gc_picker->PickBlobGC(blob_storage.get());
 
-  // TODO(@DorianZheng) Make sure enough room for GC
+      if (blob_gc) {
+        cfh = db_impl_->GetColumnFamilyHandleUnlocked(column_family_id);
+        assert(column_family_id == cfh->GetID());
+        blob_gc->SetColumnFamily(cfh.get());
+      }
+    }
 
-  if (UNLIKELY(!blob_gc)) {
-    // Nothing to do
-    ROCKS_LOG_BUFFER(log_buffer, "Titan GC nothing to do");
-  } else {
-    BlobGCJob blob_gc_job(blob_gc.get(), db_, &mutex_, db_options_, env_,
-                          env_options_, blob_manager_.get(),
-                          blob_file_set_.get(), log_buffer, &shuting_down_,
-                          stats_.get());
-    s = blob_gc_job.Prepare();
+    // TODO(@DorianZheng) Make sure enough room for GC
+
+    if (UNLIKELY(!blob_gc)) {
+      // Nothing to do
+      ROCKS_LOG_BUFFER(log_buffer, "Titan GC nothing to do");
+    } else {
+      BlobGCJob blob_gc_job(blob_gc.get(), db_, &mutex_, db_options_, env_,
+                            env_options_, blob_manager_.get(),
+                            blob_file_set_.get(), log_buffer, &shuting_down_,
+                            stats_.get());
+      s = blob_gc_job.Prepare();
+      if (s.ok()) {
+        mutex_.Unlock();
+        s = blob_gc_job.Run();
+        mutex_.Lock();
+      }
+      if (s.ok()) {
+        s = blob_gc_job.Finish();
+      }
+      blob_gc->ReleaseGcFiles();
+
+      if (blob_gc->trigger_next() &&
+          (bg_gc_scheduled_ - 1 + gc_queue_.size() <
+           2 * static_cast<uint32_t>(db_options_.max_background_gc))) {
+        RecordTick(stats_.get(), TitanStats::GC_TRIGGER_NEXT, 1);
+        // There is still data remained to be GCed
+        // and the queue is not overwhelmed
+        // then put this cf to GC queue for next GC
+        AddToGCQueue(blob_gc->column_family_handle()->GetID());
+      }
+    }
+
     if (s.ok()) {
-      mutex_.Unlock();
-      s = blob_gc_job.Run();
-      mutex_.Lock();
+      RecordTick(stats_.get(), TitanStats::GC_SUCCESS, 1);
+      // Done
+    } else {
+      SetBGError(s);
+      RecordTick(stats_.get(), TitanStats::GC_FAIL, 1);
+      ROCKS_LOG_WARN(db_options_.info_log, "Titan GC error: %s",
+                     s.ToString().c_str());
     }
-    if (s.ok()) {
-      s = blob_gc_job.Finish();
-    }
-    blob_gc->ReleaseGcFiles();
 
-    if (blob_gc->trigger_next() &&
-        (bg_gc_scheduled_ - 1 + gc_queue_.size() <
-         2 * static_cast<uint32_t>(db_options_.max_background_gc))) {
-      RecordTick(stats_.get(), TitanStats::GC_TRIGGER_NEXT, 1);
-      // There is still data remained to be GCed
-      // and the queue is not overwhelmed
-      // then put this cf to GC queue for next GC
-      AddToGCQueue(blob_gc->column_family_handle()->GetID());
-    }
-  }
-
-  if (s.ok()) {
-    RecordTick(stats_.get(), TitanStats::GC_SUCCESS, 1);
-    // Done
-  } else {
-    SetBGError(s);
-    RecordTick(stats_.get(), TitanStats::GC_FAIL, 1);
-    ROCKS_LOG_WARN(db_options_.info_log, "Titan GC error: %s",
-                   s.ToString().c_str());
-  }
-
-  TEST_SYNC_POINT("TitanDBImpl::BackgroundGC:Finish");
+    TEST_SYNC_POINT("TitanDBImpl::BackgroundGC:Finish");
   }
   gc_total += gc_time;
   return s;

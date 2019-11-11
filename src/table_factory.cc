@@ -33,10 +33,11 @@ TableBuilder* TitanTableFactory::NewTableBuilder(
     blob_storage = blob_file_set_->GetBlobStorage(column_family_id);
   }
 
-  return new TitanTableBuilder(
-      column_family_id, db_options_, cf_options, std::move(base_builder),
-      blob_manager_, blob_storage, stats_,
-      std::max(1, num_levels - 2) /* merge level */, options.level, options.start_level);
+  return new TitanTableBuilder(column_family_id, db_options_, cf_options,
+                               std::move(base_builder), blob_manager_,
+                               blob_storage, stats_,
+                               std::max(1, num_levels - 2) /* merge level */,
+                               options.level, options.start_level);
 }
 
 std::string TitanTableFactory::GetPrintableTableOptions() const {
