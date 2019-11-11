@@ -10,6 +10,7 @@
 #include "titan_stats.h"
 #include "unordered_map"
 #include "vector"
+#include "iostream"
 
 namespace rocksdb {
 namespace titandb {
@@ -21,7 +22,7 @@ class TitanTableBuilder : public TableBuilder {
                     std::unique_ptr<TableBuilder> base_builder,
                     std::shared_ptr<BlobFileManager> blob_manager,
                     std::weak_ptr<BlobStorage> blob_storage, TitanStats *stats,
-                    int merge_level, int target_level)
+                    int merge_level, int target_level, int start_level = -1)
       : cf_id_(cf_id),
         db_options_(db_options),
         cf_options_(cf_options),
@@ -30,7 +31,9 @@ class TitanTableBuilder : public TableBuilder {
         blob_storage_(blob_storage),
         stats_(stats),
         target_level_(target_level),
-        merge_level_(merge_level) {}
+        merge_level_(merge_level),
+        start_level_(start_level) {
+        }
 
   void Add(const Slice &key, const Slice &value) override;
 
@@ -81,6 +84,7 @@ class TitanTableBuilder : public TableBuilder {
   // equals to merge_level_, values belong to blob files which have lower level
   // than target_level_ will be merged to new blob file
   int merge_level_;
+  int start_level_;
 
   // counters
   uint64_t bytes_read_ = 0;
@@ -119,7 +123,7 @@ class ForegroundBuilder {
     }
     if (handles[i]->GetFile()->GetFileSize() >=
         cf_options_.blob_file_target_size) {
-      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+      pool[i].push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
                                  std::move(handles[i]), std::move(builders[i]),
                                  discardable_[i]));
       builders[i].reset();
@@ -137,19 +141,24 @@ class ForegroundBuilder {
   }
 
   void Finish() {
+    std::vector<std::vector<std::thread>> p(2);
     for (int i = 0; i < 2; i++) {
       mutex_[i].lock();
-      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+      pool[i].push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
                                  std::move(handles[i]), std::move(builders[i]),
                                  discardable_[i]));
       builders[i].reset();
       handles[i].reset();
       keys_[i].clear();
       discardable_[i] = 0;
+      p[i] = std::move(pool[i]);
+      // for (auto &t : pool[i]) t.join();
+      pool[i] = std::vector<std::thread>();
       mutex_[i].unlock();
     }
-    for (auto &t : pool) t.join();
-    pool.clear();
+    for(auto& tmp:p){
+      for(auto& t:tmp) t.join();
+    }
   }
 
   ForegroundBuilder(uint32_t cf_id,
@@ -172,7 +181,7 @@ class ForegroundBuilder {
   std::shared_ptr<BlobFileManager> blob_file_manager_;
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
-  std::vector<std::thread> pool;
+  std::vector<std::vector<std::thread>> pool{2};
   std::vector<std::mutex> mutex_{2};
   std::vector<std::unordered_map<std::string, uint64_t>> keys_{2};
   std::vector<uint64_t> discardable_{2, 0};
@@ -184,10 +193,10 @@ class ForegroundBuilder {
       builders[i].reset();
       keys_[i].clear();
       discardable_[i] = 0;
+      for (auto &t : pool[i]) t.join();
+      pool[i].clear();
       mutex_[i].unlock();
     }
-    for (auto &t : pool) t.join();
-      pool.clear();
   }
 
   Status FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
