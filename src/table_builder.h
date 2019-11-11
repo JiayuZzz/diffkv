@@ -96,42 +96,42 @@ class TitanTableBuilder : public TableBuilder {
 class ForegroundBuilder {
  public:
   Status Add(const Slice &key, const Slice &value, WriteBatch &wb) {
-    if (value.size() < cf_options_.min_blob_size)
+    if (value.size() < cf_options_.min_blob_size || (cf_options_.level_merge&&value.size()<cf_options_.mid_blob_size))
       return Status::InvalidArgument();
     Status s;
     int i = value.size() >= cf_options_.mid_blob_size ? 1 : 0;
-    mutex_[i].lock();
-    if (!handles[i] && !builders[i]) {
-      s = blob_file_manager_->NewFile(&handles[i]);
+    mutex_[0].lock();
+    if (!handle_ && !builder_) {
+      s = blob_file_manager_->NewFile(&handle_);
       if (!s.ok()) return s;
-      builders[i] = std::unique_ptr<BlobFileBuilder>(
-          new BlobFileBuilder(db_options_, cf_options_, handles[i]->GetFile()));
+      builder_ = std::unique_ptr<BlobFileBuilder>(
+          new BlobFileBuilder(db_options_, cf_options_, handle_->GetFile()));
     }
     BlobRecord blob_record;
     blob_record.key = key;
     blob_record.value = value;
     BlobIndex blob_index;
-    blob_index.file_number = handles[i]->GetNumber();
-    builders[i]->Add(blob_record, &blob_index.blob_handle);
+    blob_index.file_number = handle_->GetNumber();
+    builder_->Add(blob_record, &blob_index.blob_handle);
     std::string k = key.ToString();
-    auto iter = keys_[i].find(k);
-    if (iter == keys_[i].end()) {
-      keys_[i][k] = blob_index.blob_handle.size;
+    auto iter = keys_.find(k);
+    if (iter == keys_.end()) {
+      keys_[k] = blob_index.blob_handle.size;
     } else {
-      discardable_[i] += iter->second;
+      discardable_ += iter->second;
       iter->second = blob_index.blob_handle.size;
     }
-    if (handles[i]->GetFile()->GetFileSize() >=
+    if (handle_->GetFile()->GetFileSize() >=
         cf_options_.blob_file_target_size) {
-      pool[i].push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
-                                 std::move(handles[i]), std::move(builders[i]),
-                                 discardable_[i]));
-      builders[i].reset();
-      handles[i].reset();
-      keys_[i].clear();
-      discardable_[i] = 0;
+      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+                                 std::move(handle_), std::move(builder_),
+                                 discardable_));
+      builder_.reset();
+      handle_.reset();
+      keys_.clear();
+      discardable_ = 0;
     }
-    mutex_[i].unlock();
+    mutex_[0].unlock();
     std::string index_entry;
     blob_index.EncodeTo(&index_entry);
 
@@ -141,24 +141,20 @@ class ForegroundBuilder {
   }
 
   void Finish() {
-    std::vector<std::vector<std::thread>> p(2);
-    for (int i = 0; i < 2; i++) {
-      mutex_[i].lock();
-      pool[i].push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
-                                 std::move(handles[i]), std::move(builders[i]),
-                                 discardable_[i]));
-      builders[i].reset();
-      handles[i].reset();
-      keys_[i].clear();
-      discardable_[i] = 0;
-      p[i] = std::move(pool[i]);
+    std::vector<std::thread> p(2);
+      mutex_[0].lock();
+      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+                                 std::move(handle_), std::move(builder_),
+                                 discardable_));
+      builder_.reset();
+      handle_.reset();
+      keys_.clear();
+      discardable_ = 0;
+      p = std::move(pool);
       // for (auto &t : pool[i]) t.join();
-      pool[i] = std::vector<std::thread>();
-      mutex_[i].unlock();
-    }
-    for(auto& tmp:p){
-      for(auto& t:tmp) t.join();
-    }
+      pool = std::vector<std::thread>();
+      mutex_[0].unlock();
+      for(auto& t:p) t.join();
   }
 
   ForegroundBuilder(uint32_t cf_id,
@@ -176,27 +172,25 @@ class ForegroundBuilder {
 
  private:
   uint32_t cf_id_;
-  std::unique_ptr<BlobFileHandle> handles[2];
-  std::unique_ptr<BlobFileBuilder> builders[2];
+  std::unique_ptr<BlobFileHandle> handle_;
+  std::unique_ptr<BlobFileBuilder> builder_;
   std::shared_ptr<BlobFileManager> blob_file_manager_;
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
-  std::vector<std::vector<std::thread>> pool{2};
+  std::vector<std::thread> pool;
   std::vector<std::mutex> mutex_{2};
-  std::vector<std::unordered_map<std::string, uint64_t>> keys_{2};
-  std::vector<uint64_t> discardable_{2, 0};
+  std::unordered_map<std::string, uint64_t> keys_{};
+  uint64_t discardable_{0};
 
   void ResetBuilder() {
-    for (int i = 0; i < 2; i++) {
-      mutex_[i].lock();
-      handles[i].reset();
-      builders[i].reset();
-      keys_[i].clear();
-      discardable_[i] = 0;
-      for (auto &t : pool[i]) t.join();
-      pool[i].clear();
-      mutex_[i].unlock();
-    }
+      mutex_[0].lock();
+      handle_.reset();
+      builder_.reset();
+      keys_.clear();
+      discardable_ = 0;
+      for (auto &t : pool) t.join();
+      pool.clear();
+      mutex_[0].unlock();
   }
 
   Status FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
