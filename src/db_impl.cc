@@ -1244,7 +1244,8 @@ void TitanDBImpl::OnCompactionCompleted(
     if (cf_options.level_merge) {
       blob_file_set_->LogAndApply(edit);
       MarkFileIfNeedMerge(files, cf_options.max_sorted_runs);
-    } else {
+    } 
+    if (!cf_options.level_merge || db_options_.sep_before_flush) {
       bs->ComputeGCScore();
 
       AddToGCQueue(compaction_job_info.cf_id);

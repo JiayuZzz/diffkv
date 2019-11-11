@@ -487,10 +487,11 @@ Status BlobGCJob::InstallOutputBlobFiles() {
         files;
     std::string tmp;
     for (auto& builder : blob_file_builders_) {
+      uint32_t type = db_options_.sep_before_flush?kUnSorted:kSorted;
       auto file = std::make_shared<BlobFileMeta>(
           builder.first->GetNumber(), builder.first->GetFile()->GetFileSize(),
           0, 0, builder.second->GetSmallestKey(),
-          builder.second->GetLargestKey());
+          builder.second->GetLargestKey(),type);
       file->FileStateTransit(BlobFileMeta::FileEvent::kGCOutput);
       RecordInHistogram(stats_, TitanStats::GC_OUTPUT_FILE_SIZE,
                         file->file_size());

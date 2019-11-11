@@ -183,7 +183,7 @@ void BlobStorage::ComputeGCScore() {
   gc_score_.clear();
 
   for (auto& file : files_) {
-    if (file.second->is_obsolete()) {
+    if (file.second->is_obsolete()|| (cf_options_.level_merge && file.second->file_type() == kSorted)) {
       continue;
     }
     gc_score_.push_back({});

@@ -229,7 +229,7 @@ bool TitanTableBuilder::ShouldMerge(
   // 1. Corresponding keys are being compacted to last two level from lower
   // level
   // 2. Blob file is marked by GC or range merge
-  return file != nullptr &&
+  return file != nullptr && file->file_type()==kSorted &&
          (static_cast<int>(file->file_level()) < target_level_ ||
           file->file_state() == BlobFileMeta::FileState::kToMerge);
 }

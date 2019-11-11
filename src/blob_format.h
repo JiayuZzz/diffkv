@@ -29,6 +29,8 @@ namespace titandb {
 const uint64_t kBlobHeaderSize = 8;
 const uint64_t kRecordHeaderSize = 9;
 const uint64_t kBlobFooterSize = BlockHandle::kMaxEncodedLength + 8 + 4;
+const uint32_t kSorted = 0;
+const uint32_t kUnSorted = 1;
 
 // Format of blob record (not fixed size):
 //
@@ -185,10 +187,11 @@ class BlobFileMeta {
   BlobFileMeta(uint64_t _file_number, uint64_t _file_size,
                uint64_t _file_entries, uint32_t _file_level,
                const std::string& _smallest_key,
-               const std::string& _largest_key)
+               const std::string& _largest_key, uint32_t _file_type = kSorted)
       : file_number_(_file_number),
         file_size_(_file_size),
         file_entries_(_file_entries),
+        file_type_(_file_type),
         file_level_(_file_level),
         smallest_key_(_smallest_key),
         largest_key_(_largest_key) {}
@@ -208,6 +211,7 @@ class BlobFileMeta {
 
   FileState file_state() const { return state_; }
   bool is_obsolete() const { return state_ == FileState::kObsolete; }
+  uint32_t file_type() const { return file_type_;}
   uint64_t discardable_size() const { return discardable_size_; }
 
   bool gc_mark() const { return gc_mark_; }
@@ -227,8 +231,10 @@ class BlobFileMeta {
   uint64_t file_number_{0};
   uint64_t file_size_{0};
   uint64_t file_entries_;
+  uint32_t file_type_{kSorted};
   // Target level of compaction/flush which generates this blob file
   uint32_t file_level_;
+
   // Empty `smallest_key_` and `largest_key_` means smallest key is unknown,
   // and can only happen when the file is from legacy version.
   std::string smallest_key_;
