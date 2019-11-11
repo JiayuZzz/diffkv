@@ -1213,7 +1213,7 @@ void TitanDBImpl::OnCompactionCompleted(
       if (bfs.second >= 0) {
         if (count_sorted_run) {
           auto file = bs->FindFile(bfs.first).lock();
-          if (file != nullptr) {
+          if (file != nullptr && file->file_type() == kSorted) {
             files.emplace_back(std::move(file));
           }
         }
@@ -1249,7 +1249,7 @@ void TitanDBImpl::OnCompactionCompleted(
                        cf_options.blob_file_discardable_ratio) {
           file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
         }
-        if (count_sorted_run) {
+        if (count_sorted_run && file->file_type()==kSorted) {
           files.emplace_back(std::move(file));
         }
       }
