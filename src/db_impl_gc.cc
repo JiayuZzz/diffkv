@@ -5,6 +5,10 @@
 #include "blob_file_iterator.h"
 #include "blob_gc_job.h"
 #include "blob_gc_picker.h"
+#include "atomic"
+
+std::atomic<uint64_t> gc_total{0};
+
 
 namespace rocksdb {
 namespace titandb {
@@ -72,12 +76,14 @@ void TitanDBImpl::BackgroundCallGC() {
 Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
                                  uint32_t column_family_id) {
   mutex_.AssertHeld();
+  uint64_t gc_time = 0;
   StopWatch gc_sw(env_, stats_.get(), BLOB_DB_GC_MICROS);
 
   std::unique_ptr<BlobGC> blob_gc;
   std::unique_ptr<ColumnFamilyHandle> cfh;
   Status s;
-
+  {
+  TitanStopWatch(env_, gc_time);
   std::shared_ptr<BlobStorage> blob_storage;
   // Skip CFs that have been dropped.
   if (!blob_file_set_->IsColumnFamilyObsolete(column_family_id)) {
@@ -144,6 +150,8 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
   }
 
   TEST_SYNC_POINT("TitanDBImpl::BackgroundGC:Finish");
+  }
+  gc_total += gc_time;
   return s;
 }
 

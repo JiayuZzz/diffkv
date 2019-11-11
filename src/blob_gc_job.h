@@ -78,6 +78,7 @@ class BlobGCJob {
     uint64_t gc_sampling_micros = 0;
     uint64_t gc_read_lsm_micros = 0;
     uint64_t gc_update_lsm_micros = 0;
+    uint64_t gc_total_micros = 0;
   } metrics_;
 
   uint64_t prev_bytes_read_ = 0;

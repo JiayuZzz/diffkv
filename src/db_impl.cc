@@ -19,6 +19,16 @@
 #include "iostream"
 #include "table_factory.h"
 #include "titan_build_version.h"
+#include "atomic"
+
+extern std::atomic<uint64_t> bytes_written;
+extern std::atomic<uint64_t> gc_update_lsm;
+extern std::atomic<uint64_t> gc_read_lsm;
+extern std::atomic<uint64_t> gc_write_value;
+extern std::atomic<uint64_t> gc_total;
+extern std::atomic<uint64_t> gc_sample;
+extern std::atomic<uint64_t> blob_merge_time;
+
 
 namespace rocksdb {
 namespace titandb {
@@ -144,9 +154,16 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
 }
 
 TitanDBImpl::~TitanDBImpl() {
+  DumpStats();
   for (auto& builder : builders_) builder.second.Finish();
   PurgeObsoleteFiles();
   Close();
+  std::cout<<"blob builder written bytes: "<<bytes_written<<std::endl;
+  std::cout<<"gc update lsm time: "<<gc_update_lsm<<std::endl;
+  std::cout<<"gc read lsm time: "<<gc_read_lsm<<std::endl;
+  std::cout<<"gc sample time: "<<gc_sample<<std::endl;
+  std::cout<<"total gc time: "<<gc_total<<std::endl;
+  std::cout<<"blob merge time: "<<blob_merge_time<<std::endl;
 }
 
 void TitanDBImpl::StartBackgroundTasks() {
@@ -854,7 +871,7 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
         edit.DeleteBlobFile(file->file_number(),
                             db_impl_->GetLatestSequenceNumber());
       } else if (file->GetDiscardableRatio() >
-                 cf_options.blob_file_discardable_ratio) {
+                 ((int)file->file_level() == cf_options.num_levels-1?cf_options.blob_file_discardable_ratio:cf_options.high_level_blob_discardable_ratio)) {
         file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
       }
     }

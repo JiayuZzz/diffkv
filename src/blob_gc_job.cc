@@ -4,8 +4,15 @@
 #include <inttypes.h>
 
 #include <memory>
+#include <atomic>
 
 #include "blob_gc_job.h"
+#include "iostream"
+
+std::atomic<uint64_t> gc_update_lsm{0};
+std::atomic<uint64_t> gc_read_lsm{0};
+std::atomic<uint64_t> gc_write_value{0};
+std::atomic<uint64_t> gc_sample{0};
 
 namespace rocksdb {
 namespace titandb {
@@ -500,6 +507,7 @@ Status BlobGCJob::InstallOutputBlobFiles() {
       }
       tmp.append(std::to_string(file->file_number()));
       files.emplace_back(std::make_pair(file, std::move(builder.first)));
+      std::cerr<<"gc output file"<<std::endl;
     }
     ROCKS_LOG_BUFFER(log_buffer_, "[%s] output[%s]",
                      blob_gc_->column_family_handle()->GetName().c_str(),
@@ -637,6 +645,9 @@ void BlobGCJob::UpdateInternalOpStats() {
            metrics_.gc_read_lsm_micros);
   AddStats(internal_op_stats, InternalOpStatsType::GC_UPDATE_LSM_MICROS,
            metrics_.gc_update_lsm_micros);
+  gc_read_lsm += metrics_.gc_read_lsm_micros;
+  gc_update_lsm += metrics_.gc_update_lsm_micros;
+  gc_sample += metrics_.gc_sampling_micros;
 }
 
 }  // namespace titandb

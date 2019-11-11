@@ -64,6 +64,8 @@ class TitanTableBuilder : public TableBuilder {
 
   void UpdateInternalOpStats();
 
+  ~TitanTableBuilder();
+
   Status status_;
   uint32_t cf_id_;
   TitanDBOptions db_options_;
@@ -77,6 +79,7 @@ class TitanTableBuilder : public TableBuilder {
       std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>>
       finished_blobs_;
   TitanStats *stats_;
+  uint64_t blob_merge_time_{0};
 
   // target level in LSM-Tree for generated SSTs and blob files
   int target_level_;
@@ -99,7 +102,6 @@ class ForegroundBuilder {
     if (value.size() < cf_options_.min_blob_size || (cf_options_.level_merge&&value.size()<cf_options_.mid_blob_size))
       return Status::InvalidArgument();
     Status s;
-    int i = value.size() >= cf_options_.mid_blob_size ? 1 : 0;
     mutex_[0].lock();
     if (!handle_ && !builder_) {
       s = blob_file_manager_->NewFile(&handle_);
@@ -151,7 +153,6 @@ class ForegroundBuilder {
       keys_.clear();
       discardable_ = 0;
       p = std::move(pool);
-      // for (auto &t : pool[i]) t.join();
       pool = std::vector<std::thread>();
       mutex_[0].unlock();
       for(auto& t:p) t.join();

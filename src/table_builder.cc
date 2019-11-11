@@ -5,10 +5,20 @@
 #endif
 
 #include <inttypes.h>
+#include <iostream>
 #include "monitoring/statistics.h"
+#include <atomic>
+
+std::atomic<uint64_t> blob_merge_time{0};
+rocksdb::Env* env_ = rocksdb::Env::Default();
+
 
 namespace rocksdb {
 namespace titandb {
+
+TitanTableBuilder::~TitanTableBuilder(){
+  blob_merge_time += blob_merge_time_;
+}
 
 void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
   if (!ok()) return;
@@ -79,10 +89,10 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
     if (!ok()) {
       return;
     }
-    if (db_options_.sep_before_flush && index.blob_handle.size >= cf_options_.mid_blob_size) {
-      base_builder_->Add(key, value);
-      return;
-    }
+    // if (db_options_.sep_before_flush && index.blob_handle.size >= cf_options_.mid_blob_size) {
+      // base_builder_->Add(key, value);
+      // return;
+    // }
     auto storage = blob_storage_.lock();
     assert(storage != nullptr);
     auto blob_file = storage->FindFile(index.file_number).lock();
@@ -92,7 +102,10 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
       Status s = storage->Get(ReadOptions(), index, &record, &buffer);
       if (s.ok()) {
         std::string index_value;
+        {
+        TitanStopWatch sw(env_, blob_merge_time_);
         AddBlob(ikey.user_key, record.value, &index_value);
+        }
         if (ok()) {
           std::string index_key;
           ikey.type = kTypeBlobIndex;
@@ -156,7 +169,7 @@ void TitanTableBuilder::FinishBlobFile() {
       std::shared_ptr<BlobFileMeta> file = std::make_shared<BlobFileMeta>(
           blob_handle_->GetNumber(), blob_handle_->GetFile()->GetFileSize(),
           blob_builder_->NumEntries(), target_level_,
-          blob_builder_->GetSmallestKey(), blob_builder_->GetLargestKey());
+          blob_builder_->GetSmallestKey(), blob_builder_->GetLargestKey(), kSorted);
       file->FileStateTransit(BlobFileMeta::FileEvent::kFlushOrCompactionOutput);
       finished_blobs_.push_back({file, std::move(blob_handle_)});
       blob_builder_.reset();

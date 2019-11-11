@@ -1,4 +1,7 @@
 #include "blob_file_builder.h"
+#include "atomic"
+
+std::atomic<uint64_t> bytes_written{0};
 
 namespace rocksdb {
 namespace titandb {
@@ -24,6 +27,7 @@ void BlobFileBuilder::Add(const BlobRecord& record, BlobHandle* handle) {
 
   status_ = file_->Append(encoder_.GetHeader());
   if (ok()) {
+    bytes_written += handle->size;
     status_ = file_->Append(encoder_.GetRecord());
     num_entries_++;
     // The keys added into blob files are in order.
