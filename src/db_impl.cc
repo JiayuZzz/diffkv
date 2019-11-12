@@ -1230,6 +1230,7 @@ void TitanDBImpl::OnCompactionCompleted(
       }
       auto before = file->GetDiscardableRatioLevel();
       file->AddDiscardableSize(static_cast<uint64_t>(-bfs.second));
+      // std::cerr<<"after add "<<file->GetDiscardableRatio()<<std::endl;
       auto after = file->GetDiscardableRatioLevel();
       if (before != after) {
         AddStats(stats_.get(), compaction_job_info.cf_id, after, 1);

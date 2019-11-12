@@ -5,6 +5,7 @@
 #endif
 
 #include <inttypes.h>
+#include <iostream>
 
 namespace rocksdb {
 namespace titandb {
@@ -28,6 +29,7 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
   uint64_t next_gc_size = 0;
   for (auto& gc_score : blob_storage->gc_score()) {
     if (gc_score.score < cf_options_.blob_file_discardable_ratio) {
+      // std::cerr<<"break"<<std::endl;
       break;
     }
     auto blob_file = blob_storage->FindFile(gc_score.file_number).lock();
@@ -37,6 +39,8 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
       // or this file had been GCed
       ROCKS_LOG_INFO(db_options_.info_log, "Blob file %" PRIu64 " no need gc",
                      blob_file->file_number());
+      // std::cerr<<"no need gc"<<std::endl;
+      // if(!blob_file) std::cerr<<"no such file"<<std::endl;
       continue;
     }
     if (!stop_picking) {
@@ -68,6 +72,9 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
                   " bytes",
                   batch_size, estimate_output_size);
   if (blob_files.empty() || batch_size < cf_options_.min_gc_batch_size) {
+    // std::cerr<<blob_storage->gc_score().front().score<<std::endl;
+    // if(batch_size<cf_options_.min_gc_batch_size) std::cerr<<"min batch"<<std::endl;
+    // if(blob_files.empty()) std::cerr<<"empty blob"<<std::endl;
     return nullptr;
   }
   // if there is only one small file to merge, no need to perform

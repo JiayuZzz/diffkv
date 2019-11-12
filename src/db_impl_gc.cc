@@ -6,6 +6,7 @@
 #include "blob_file_iterator.h"
 #include "blob_gc_job.h"
 #include "blob_gc_picker.h"
+#include <iostream>
 
 std::atomic<uint64_t> gc_total{0};
 
@@ -118,6 +119,7 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
                             stats_.get());
       s = blob_gc_job.Prepare();
       if (s.ok()) {
+        std::cerr<<"run gc"<<std::endl;
         mutex_.Unlock();
         s = blob_gc_job.Run();
         mutex_.Lock();

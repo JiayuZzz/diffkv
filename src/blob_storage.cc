@@ -1,5 +1,6 @@
 #include "blob_storage.h"
 #include "blob_file_set.h"
+#include "iostream"
 
 namespace rocksdb {
 namespace titandb {
@@ -199,6 +200,8 @@ void BlobStorage::ComputeGCScore() {
     } else {
       gcs.score = file.second->GetDiscardableRatio();
     }
+    // if(gcs.score >= cf_options_.blob_file_discardable_ratio)
+      // std::cerr<<"gc score is "<<gcs.score<<std::endl;
   }
 
   std::sort(gc_score_.begin(), gc_score_.end(),

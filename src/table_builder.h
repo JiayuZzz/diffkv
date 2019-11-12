@@ -215,6 +215,7 @@ class ForegroundBuilder {
           handle->GetNumber(), handle->GetFile()->GetFileSize(),
           builder->NumEntries(), 0, builder->GetSmallestKey(),
           builder->GetLargestKey(), kUnSorted);
+      file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
       file->AddDiscardableSize(discardable);
       files.emplace_back(std::make_pair(file, std::move(handle)));
       s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
