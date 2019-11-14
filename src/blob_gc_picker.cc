@@ -33,7 +33,7 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
       break;
     }
     auto blob_file = blob_storage->FindFile(gc_score.file_number).lock();
-    if (!CheckBlobFile(blob_file.get())) {
+    if (!CheckBlobFile(blob_file.get()) || (cf_options_.level_merge && blob_file->file_type()==kUnSorted)) {
       RecordTick(stats_, TitanStats::GC_NO_NEED, 1);
       // Skip this file id this file is being GCed
       // or this file had been GCed

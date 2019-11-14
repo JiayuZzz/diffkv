@@ -86,6 +86,10 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
     if (!ok()) {
       return;
     }
+    if(db_options_.sep_before_flush && index.blob_handle.size >= cf_options_.mid_blob_size){
+      base_builder_->Add(key, value);
+      return;
+    }
     // if (db_options_.sep_before_flush && index.blob_handle.size >=
     // cf_options_.mid_blob_size) { base_builder_->Add(key, value); return;
     // }
