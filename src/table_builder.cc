@@ -11,6 +11,8 @@
 
 std::atomic<uint64_t> blob_merge_time{0};
 std::atomic<uint64_t> blob_read_time{0};
+std::atomic<uint64_t> blob_add_time{0};
+std::atomic<uint64_t> blob_finish_time{0};
 rocksdb::Env* env_ = rocksdb::Env::Default();
 
 namespace rocksdb {
@@ -19,9 +21,12 @@ namespace titandb {
 TitanTableBuilder::~TitanTableBuilder() { 
   blob_merge_time += blob_merge_time_; 
   blob_read_time += blob_read_time_;
+  blob_add_time += blob_add_time_;
+  blob_finish_time += blob_finish_time_;
 }
 
 void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
+  TitanStopWatch swadd(env_, blob_add_time_);
   if (!ok()) return;
 
   ParsedInternalKey ikey;
@@ -168,6 +173,7 @@ void TitanTableBuilder::AddBlob(const Slice& key, const Slice& value,
 }
 
 void TitanTableBuilder::FinishBlobFile() {
+  TitanStopWatch sw(env_, blob_finish_time_);
   if (blob_builder_) {
     blob_builder_->Finish();
     if (ok()) {
