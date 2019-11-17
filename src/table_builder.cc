@@ -10,12 +10,16 @@
 #include "monitoring/statistics.h"
 
 std::atomic<uint64_t> blob_merge_time{0};
+std::atomic<uint64_t> blob_read_time{0};
 rocksdb::Env* env_ = rocksdb::Env::Default();
 
 namespace rocksdb {
 namespace titandb {
 
-TitanTableBuilder::~TitanTableBuilder() { blob_merge_time += blob_merge_time_; }
+TitanTableBuilder::~TitanTableBuilder() { 
+  blob_merge_time += blob_merge_time_; 
+  blob_read_time += blob_read_time_;
+}
 
 void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
   if (!ok()) return;
@@ -99,7 +103,11 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
     if (ShouldMerge(blob_file)) {
       BlobRecord record;
       PinnableSlice buffer;
-      Status s = storage->Get(ReadOptions(), index, &record, &buffer);
+      Status s;
+      {
+        TitanStopWatch sw(env_, blob_read_time_);
+        s = storage->Get(ReadOptions(), index, &record, &buffer);
+      }
       if (s.ok()) {
         std::string index_value;
         {

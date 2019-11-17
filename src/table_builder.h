@@ -78,6 +78,7 @@ class TitanTableBuilder : public TableBuilder {
       finished_blobs_;
   TitanStats *stats_;
   uint64_t blob_merge_time_{0};
+  uint64_t blob_read_time_{0};
 
   // target level in LSM-Tree for generated SSTs and blob files
   int target_level_;
