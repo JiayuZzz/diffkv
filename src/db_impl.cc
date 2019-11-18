@@ -191,14 +191,6 @@ void TitanDBImpl::StartBackgroundTasks() {
 Status TitanDBImpl::ValidateOptions(
     const TitanDBOptions& options,
     const std::vector<TitanCFDescriptor>& column_families) const {
-  for (const auto& cf : column_families) {
-    if (cf.options.level_merge &&
-        !cf.options.level_compaction_dynamic_level_bytes) {
-      return Status::InvalidArgument(
-          "Require enabling level_compaction_dynamic_level_bytes for "
-          "level_merge");
-    }
-  }
   return Status::OK();
 }
 
