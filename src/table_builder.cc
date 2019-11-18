@@ -14,10 +14,12 @@ std::atomic<uint64_t> blob_read_time{0};
 std::atomic<uint64_t> blob_add_time{0};
 std::atomic<uint64_t> blob_finish_time{0};
 std::atomic<uint64_t> foreground_blob_add_time{0};
-rocksdb::Env* env_ = rocksdb::Env::Default();
+//rocksdb::Env* env_ = rocksdb::Env::Default();
+// extern rocksdb::Env* env_;
 
 namespace rocksdb {
 namespace titandb {
+Env* env_ = Env::Default();
 
 TitanTableBuilder::~TitanTableBuilder() {
   blob_merge_time += blob_merge_time_;
