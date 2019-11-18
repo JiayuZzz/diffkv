@@ -83,7 +83,7 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
   std::unique_ptr<ColumnFamilyHandle> cfh;
   Status s;
   {
-    TitanStopWatch(env_, gc_time);
+    TitanStopWatch sw(env_, gc_time);
     std::shared_ptr<BlobStorage> blob_storage;
     // Skip CFs that have been dropped.
     if (!blob_file_set_->IsColumnFamilyObsolete(column_family_id)) {
