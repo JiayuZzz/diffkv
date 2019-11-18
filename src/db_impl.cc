@@ -878,7 +878,7 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
         edit.DeleteBlobFile(file->file_number(),
                             db_impl_->GetLatestSequenceNumber());
       } else if (file->GetDiscardableRatio() >
-                 ((int)file->file_level() == cf_options.num_levels - 1
+                 ((int)file->file_level() == 3
                       ? cf_options.blob_file_discardable_ratio
                       : cf_options.high_level_blob_discardable_ratio)) {
         file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
@@ -1214,9 +1214,7 @@ void TitanDBImpl::OnCompactionCompleted(
     VersionEdit edit;
     auto cf_options = bs->cf_options();
     std::vector<std::shared_ptr<BlobFileMeta>> files;
-    bool count_sorted_run =
-        cf_options.level_merge && cf_options.range_merge &&
-        cf_options.num_levels - 1 == compaction_job_info.output_level;
+    bool count_sorted_run = false;
     for (const auto& bfs : blob_files_size_diff) {
       // blob file size < 0 means discardable size > 0
       if (bfs.second >= 0) {
@@ -1254,7 +1252,7 @@ void TitanDBImpl::OnCompactionCompleted(
                               db_impl_->GetLatestSequenceNumber());
           continue;
         } else if (static_cast<int>(file->file_level()) >=
-                       cf_options.num_levels - 2 &&
+                       2 &&
                    file->GetDiscardableRatio() >
                        cf_options.blob_file_discardable_ratio) {
           file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
