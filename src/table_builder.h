@@ -143,25 +143,7 @@ class ForegroundBuilder {
 
   Status FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
                     std::unique_ptr<BlobFileBuilder> &&builder,
-                    uint64_t discardable) {
-    Status s;
-    std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
-                          std::unique_ptr<BlobFileHandle>>>
-        files;
-    if (!builder && !handle) return s;
-    s = builder->Finish();
-    if (s.ok()) {
-      auto file = std::make_shared<BlobFileMeta>(
-          handle->GetNumber(), handle->GetFile()->GetFileSize(),
-          builder->NumEntries(), 0, builder->GetSmallestKey(),
-          builder->GetLargestKey(), kUnSorted);
-      file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
-      file->AddDiscardableSize(discardable);
-      files.emplace_back(std::make_pair(file, std::move(handle)));
-      s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
-    }
-    return s;
-  }
+                    uint64_t discardable);
 };
 
 }  // namespace titandb

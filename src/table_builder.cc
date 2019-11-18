@@ -14,6 +14,7 @@ std::atomic<uint64_t> blob_read_time{0};
 std::atomic<uint64_t> blob_add_time{0};
 std::atomic<uint64_t> blob_finish_time{0};
 std::atomic<uint64_t> foreground_blob_add_time{0};
+std::atomic<uint64_t> foreground_blob_finish_time{0};
 //rocksdb::Env* env_ = rocksdb::Env::Default();
 // extern rocksdb::Env* env_;
 
@@ -374,6 +375,33 @@ void ForegroundBuilder::Finish() {
     pool = std::vector<std::thread>();
     mutex_[0].unlock();
     for (auto &t : p) t.join();
+  }
+
+  Status ForegroundBuilder::FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
+                    std::unique_ptr<BlobFileBuilder> &&builder,
+                    uint64_t discardable) {
+    uint64_t finish_time = 0;
+    Status s;
+    {
+    TitanStopWatch sw(env_, finish_time);
+    std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
+                          std::unique_ptr<BlobFileHandle>>>
+        files;
+    if (!builder && !handle) return s;
+    s = builder->Finish();
+    if (s.ok()) {
+      auto file = std::make_shared<BlobFileMeta>(
+          handle->GetNumber(), handle->GetFile()->GetFileSize(),
+          builder->NumEntries(), 0, builder->GetSmallestKey(),
+          builder->GetLargestKey(), kUnSorted);
+      file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
+      file->AddDiscardableSize(discardable);
+      files.emplace_back(std::make_pair(file, std::move(handle)));
+      s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
+    }
+    }
+    foreground_blob_finish_time += finish_time;
+    return s;
   }
 
 }  // namespace titandb
