@@ -13,6 +13,7 @@ std::atomic<uint64_t> blob_merge_time{0};
 std::atomic<uint64_t> blob_read_time{0};
 std::atomic<uint64_t> blob_add_time{0};
 std::atomic<uint64_t> blob_finish_time{0};
+std::atomic<uint64_t> foreground_blob_add_time{0};
 rocksdb::Env* env_ = rocksdb::Env::Default();
 
 namespace rocksdb {
@@ -298,6 +299,80 @@ void TitanTableBuilder::UpdateInternalOpStats() {
     AddStats(internal_op_stats, InternalOpStatsType::OUTPUT_FILE_NUM);
   }
 }
+
+Status ForegroundBuilder::Add(const Slice &key, const Slice &value, WriteBatch &wb) {
+    uint64_t add_time = 0;
+    Status s;
+    {
+    TitanStopWatch swadd(env_, add_time);
+    mutex_[0].lock();
+    std::string k = key.ToString();
+    if (value.size() < cf_options_.min_blob_size ||
+        (cf_options_.level_merge && value.size() < cf_options_.mid_blob_size)) {
+      auto iter = keys_.find(k);
+      if (iter == keys_.end()) {
+      } else {
+        discardable_ += iter->second;
+        keys_.erase(iter);
+      }
+      mutex_[0].unlock();
+      return Status::InvalidArgument();
+    }
+    if (!handle_ && !builder_) {
+      s = blob_file_manager_->NewFile(&handle_);
+      if (!s.ok()) return s;
+      builder_ = std::unique_ptr<BlobFileBuilder>(
+          new BlobFileBuilder(db_options_, cf_options_, handle_->GetFile()));
+    }
+    BlobRecord blob_record;
+    blob_record.key = key;
+    blob_record.value = value;
+    BlobIndex blob_index;
+    blob_index.file_number = handle_->GetNumber();
+    builder_->Add(blob_record, &blob_index.blob_handle);
+    auto iter = keys_.find(k);
+    if (iter == keys_.end()) {
+      keys_[k] = blob_index.blob_handle.size;
+    } else {
+      discardable_ += iter->second;
+      iter->second = blob_index.blob_handle.size;
+    }
+    if (handle_->GetFile()->GetFileSize() >=
+        cf_options_.blob_file_target_size) {
+      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+                                 std::move(handle_), std::move(builder_),
+                                 discardable_));
+      builder_.reset();
+      handle_.reset();
+      keys_.clear();
+      discardable_ = 0;
+    }
+    mutex_[0].unlock();
+    std::string index_entry;
+    blob_index.EncodeTo(&index_entry);
+
+    s = WriteBatchInternal::PutBlobIndex(&wb, cf_id_, blob_record.key,
+                                         index_entry);
+    }
+    foreground_blob_add_time += add_time;
+    return s;
+  }
+
+void ForegroundBuilder::Finish() {
+    std::vector<std::thread> p(2);
+    mutex_[0].lock();
+    pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+                               std::move(handle_), std::move(builder_),
+                               discardable_));
+    builder_.reset();
+    handle_.reset();
+    keys_.clear();
+    discardable_ = 0;
+    p = std::move(pool);
+    pool = std::vector<std::thread>();
+    mutex_[0].unlock();
+    for (auto &t : p) t.join();
+  }
 
 }  // namespace titandb
 }  // namespace rocksdb
