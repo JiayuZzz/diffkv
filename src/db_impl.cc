@@ -32,7 +32,6 @@ extern std::atomic<uint64_t> blob_read_time;
 extern std::atomic<uint64_t> blob_add_time;
 extern std::atomic<uint64_t> blob_finish_time;
 
-
 namespace rocksdb {
 namespace titandb {
 
@@ -167,9 +166,9 @@ TitanDBImpl::~TitanDBImpl() {
   std::cout << "gc sample time: " << gc_sample << std::endl;
   std::cout << "total gc time: " << gc_total << std::endl;
   std::cout << "blob merge time: " << blob_merge_time << std::endl;
-  std::cout << "blob read time: " << blob_read_time <<std::endl;
-  std::cout << "blob add time: " << blob_add_time <<std::endl;
-  std::cout << "blob finish time; " << blob_finish_time <<std::endl;
+  std::cout << "blob read time: " << blob_read_time << std::endl;
+  std::cout << "blob add time: " << blob_add_time << std::endl;
+  std::cout << "blob finish time; " << blob_finish_time << std::endl;
 }
 
 void TitanDBImpl::StartBackgroundTasks() {

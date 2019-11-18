@@ -2,11 +2,11 @@
 
 #include "test_util/sync_point.h"
 
+#include <iostream>
 #include "atomic"
 #include "blob_file_iterator.h"
 #include "blob_gc_job.h"
 #include "blob_gc_picker.h"
-#include <iostream>
 
 std::atomic<uint64_t> gc_total{0};
 

@@ -18,8 +18,8 @@ rocksdb::Env* env_ = rocksdb::Env::Default();
 namespace rocksdb {
 namespace titandb {
 
-TitanTableBuilder::~TitanTableBuilder() { 
-  blob_merge_time += blob_merge_time_; 
+TitanTableBuilder::~TitanTableBuilder() {
+  blob_merge_time += blob_merge_time_;
   blob_read_time += blob_read_time_;
   blob_add_time += blob_add_time_;
   blob_finish_time += blob_finish_time_;
@@ -95,23 +95,32 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
     if (!ok()) {
       return;
     }
-    if(db_options_.sep_before_flush && index.blob_handle.size >= cf_options_.mid_blob_size){
+    if (db_options_.sep_before_flush &&
+        index.blob_handle.size >= cf_options_.mid_blob_size) {
       base_builder_->Add(key, value);
       return;
     }
-    // if (db_options_.sep_before_flush && index.blob_handle.size >=
-    // cf_options_.mid_blob_size) { base_builder_->Add(key, value); return;
-    // }
     auto storage = blob_storage_.lock();
     assert(storage != nullptr);
     auto blob_file = storage->FindFile(index.file_number).lock();
     if (ShouldMerge(blob_file)) {
+      auto it = merging_files_.find(index.file_number);
+      if (it == merging_files_.end()) {
+        std::unique_ptr<BlobFilePrefetcher> prefetcher;
+        status_ = storage->NewPrefetcher(index.file_number, &prefetcher);
+        if (!status_.ok()) {
+          base_builder_->Add(key, value);
+          return;
+        }
+        it = merging_files_.emplace(index.file_number, std::move(prefetcher))
+                 .first;
+      }
       BlobRecord record;
       PinnableSlice buffer;
       Status s;
       {
         TitanStopWatch sw(env_, blob_read_time_);
-        s = storage->Get(ReadOptions(), index, &record, &buffer);
+        s = it->second->Get(ReadOptions(), index.blob_handle, &record, &buffer);
       }
       if (s.ok()) {
         std::string index_value;

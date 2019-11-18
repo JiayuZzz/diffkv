@@ -77,6 +77,8 @@ class TitanTableBuilder : public TableBuilder {
       std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>>
       finished_blobs_;
   TitanStats *stats_;
+  std::unordered_map<uint64_t, std::unique_ptr<BlobFilePrefetcher>>
+      merging_files_;
   uint64_t blob_merge_time_{0};
   uint64_t blob_read_time_{0};
   uint64_t blob_add_time_{0};

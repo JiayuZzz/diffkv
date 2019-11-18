@@ -33,7 +33,8 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
       break;
     }
     auto blob_file = blob_storage->FindFile(gc_score.file_number).lock();
-    if (!CheckBlobFile(blob_file.get()) || (cf_options_.level_merge && blob_file->file_type()==kUnSorted)) {
+    if (!CheckBlobFile(blob_file.get()) ||
+        (cf_options_.level_merge && blob_file->file_type() == kUnSorted)) {
       RecordTick(stats_, TitanStats::GC_NO_NEED, 1);
       // Skip this file id this file is being GCed
       // or this file had been GCed
@@ -73,8 +74,9 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
                   batch_size, estimate_output_size);
   if (blob_files.empty() || batch_size < cf_options_.min_gc_batch_size) {
     // std::cerr<<blob_storage->gc_score().front().score<<std::endl;
-    // if(batch_size<cf_options_.min_gc_batch_size) std::cerr<<"min batch"<<std::endl;
-    // if(blob_files.empty()) std::cerr<<"empty blob"<<std::endl;
+    // if(batch_size<cf_options_.min_gc_batch_size) std::cerr<<"min
+    // batch"<<std::endl; if(blob_files.empty()) std::cerr<<"empty
+    // blob"<<std::endl;
     return nullptr;
   }
   // if there is only one small file to merge, no need to perform
