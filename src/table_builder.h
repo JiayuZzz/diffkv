@@ -129,6 +129,9 @@ class ForegroundBuilder {
   std::vector<std::mutex> mutex_{2};
   std::unordered_map<std::string, uint64_t> keys_{};
   uint64_t discardable_{0};
+      std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
+                          std::unique_ptr<BlobFileHandle>>>
+        finished_files_;
 
   void ResetBuilder() {
     mutex_[0].lock();

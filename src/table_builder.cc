@@ -363,6 +363,8 @@ Status ForegroundBuilder::Add(const Slice &key, const Slice &value, WriteBatch &
 
 void ForegroundBuilder::Finish() {
     std::vector<std::thread> p(2);
+    std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
+                          std::unique_ptr<BlobFileHandle>>> files;
     mutex_[0].lock();
     pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
                                std::move(handle_), std::move(builder_),
@@ -373,8 +375,12 @@ void ForegroundBuilder::Finish() {
     discardable_ = 0;
     p = std::move(pool);
     pool = std::vector<std::thread>();
+    files = std::move(finished_files_);
+    finished_files_ = std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
+                          std::unique_ptr<BlobFileHandle>>>();
     mutex_[0].unlock();
     for (auto &t : p) t.join();
+    blob_file_manager_->BatchFinishFiles(cf_id_, files);
   }
 
   Status ForegroundBuilder::FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
@@ -396,8 +402,9 @@ void ForegroundBuilder::Finish() {
           builder->GetLargestKey(), kUnSorted);
       file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
       file->AddDiscardableSize(discardable);
-      files.emplace_back(std::make_pair(file, std::move(handle)));
-      s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
+      finished_files_.emplace_back(std::make_pair(file, std::move(handle)));
+      // files.emplace_back(std::make_pair(file, std::move(handle)));
+      // s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
     }
     }
     foreground_blob_finish_time += finish_time;
