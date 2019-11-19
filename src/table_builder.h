@@ -125,13 +125,13 @@ class ForegroundBuilder {
   std::shared_ptr<BlobFileManager> blob_file_manager_;
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
-  std::vector<std::thread> pool;
+  std::vector<std::thread> pool{};
   std::vector<std::mutex> mutex_{2};
   std::unordered_map<std::string, uint64_t> keys_{};
   uint64_t discardable_{0};
       std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
                           std::unique_ptr<BlobFileHandle>>>
-        finished_files_;
+        finished_files_{};
 
   void ResetBuilder() {
     mutex_[0].lock();
@@ -141,6 +141,7 @@ class ForegroundBuilder {
     discardable_ = 0;
     for (auto &t : pool) t.join();
     pool.clear();
+    finished_files_.clear();
     mutex_[0].unlock();
   }
 
