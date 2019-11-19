@@ -45,6 +45,7 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
 
   if (ikey.type == kTypeBlobIndex &&
       cf_options_.blob_run_mode == TitanBlobRunMode::kFallback) {
+    std::cerr<<"fall back"<<std::endl;
     // we ingest value from blob file
     Slice copy = value;
     BlobIndex index;
@@ -99,11 +100,11 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
     if (!ok()) {
       return;
     }
-    if (db_options_.sep_before_flush &&
-        index.blob_handle.size >= cf_options_.mid_blob_size) {
-      base_builder_->Add(key, value);
-      return;
-    }
+    // if (db_options_.sep_before_flush &&
+        // index.blob_handle.size >= cf_options_.mid_blob_size) {
+      // base_builder_->Add(key, value);
+      // return;
+    // }
     auto storage = blob_storage_.lock();
     assert(storage != nullptr);
     auto blob_file = storage->FindFile(index.file_number).lock();
@@ -113,6 +114,7 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
         std::unique_ptr<BlobFilePrefetcher> prefetcher;
         status_ = storage->NewPrefetcher(index.file_number, &prefetcher);
         if (!status_.ok()) {
+          std::cerr<<"create prefetcher error!"<<std::endl;
           base_builder_->Add(key, value);
           return;
         }
@@ -138,6 +140,8 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
           AppendInternalKey(&index_key, ikey);
           base_builder_->Add(index_key, index_value);
           return;
+        } else {
+          std::cerr<<"not ok!"<<std::endl;
         }
       }
     }
@@ -378,9 +382,9 @@ void ForegroundBuilder::Finish() {
     files = std::move(finished_files_);
     finished_files_ = std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
                           std::unique_ptr<BlobFileHandle>>>();
-    mutex_[0].unlock();
     for (auto &t : p) t.join();
-    blob_file_manager_->BatchFinishFiles(cf_id_, files);
+    mutex_[0].unlock();
+    blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_);
   }
 
   Status ForegroundBuilder::FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
@@ -402,7 +406,9 @@ void ForegroundBuilder::Finish() {
           builder->GetLargestKey(), kUnSorted);
       file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
       file->AddDiscardableSize(discardable);
+      mutex_[0].lock();
       finished_files_.emplace_back(std::make_pair(file, std::move(handle)));
+      mutex_[0].unlock();
       // files.emplace_back(std::make_pair(file, std::move(handle)));
       // s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
     }

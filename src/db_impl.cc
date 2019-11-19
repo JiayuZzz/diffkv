@@ -1245,10 +1245,10 @@ void TitanDBImpl::OnCompactionCompleted(
           edit.DeleteBlobFile(file->file_number(),
                               db_impl_->GetLatestSequenceNumber());
           continue;
-        } else if (static_cast<int>(file->file_level()) >=
+        } else if (file->file_type()==kSorted && static_cast<int>(file->file_level()) >=
                        2 &&
                    file->GetDiscardableRatio() >
-                       cf_options.blob_file_discardable_ratio) {
+                       cf_options.blob_file_discardable_ratio ) {
           file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
         }
         if (count_sorted_run && file->file_type() == kSorted) {
