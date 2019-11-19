@@ -346,9 +346,10 @@ Status ForegroundBuilder::Add(const Slice &key, const Slice &value, WriteBatch &
     }
     if (handle_->GetFile()->GetFileSize() >=
         cf_options_.blob_file_target_size) {
-      pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
-                                 std::move(handle_), std::move(builder_),
-                                 discardable_));
+      // pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+                                //  std::move(handle_), std::move(builder_),
+                                //  discardable_));
+      FinishBlob(std::move(handle_), std::move(builder_), discardable_);
       builder_.reset();
       handle_.reset();
       keys_.clear();
@@ -370,9 +371,10 @@ void ForegroundBuilder::Finish() {
     std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
                           std::unique_ptr<BlobFileHandle>>> files;
     mutex_[0].lock();
-    pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
-                               std::move(handle_), std::move(builder_),
-                               discardable_));
+    // pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+                              //  std::move(handle_), std::move(builder_),
+                              //  discardable_));
+    FinishBlob(std::move(handle_), std::move(builder_), discardable_);
     builder_.reset();
     handle_.reset();
     keys_.clear();
@@ -406,11 +408,7 @@ void ForegroundBuilder::Finish() {
           builder->GetLargestKey(), kUnSorted);
       file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
       file->AddDiscardableSize(discardable);
-      mutex_[0].lock();
       finished_files_.emplace_back(std::make_pair(file, std::move(handle)));
-      mutex_[0].unlock();
-      // files.emplace_back(std::make_pair(file, std::move(handle)));
-      // s = blob_file_manager_->BatchFinishFiles(cf_id_, files);
     }
     }
     foreground_blob_finish_time += finish_time;

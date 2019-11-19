@@ -231,7 +231,7 @@ class BlobFileMeta {
   uint64_t file_number_{0};
   uint64_t file_size_{0};
   uint64_t file_entries_;
-  uint32_t file_type_{kSorted};
+  uint32_t file_type_{kUnSorted};
   // Target level of compaction/flush which generates this blob file
   uint32_t file_level_;
 
