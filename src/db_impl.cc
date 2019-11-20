@@ -1023,6 +1023,17 @@ TitanDBOptions TitanDBImpl::GetTitanDBOptions() const {
 
 bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
                               const Slice& property, std::string* value) {
+  std::cout << "blob builder written bytes: " << bytes_written << std::endl;
+  std::cout << "gc update lsm time: " << gc_update_lsm << std::endl;
+  std::cout << "gc read lsm time: " << gc_read_lsm << std::endl;
+  std::cout << "gc sample time: " << gc_sample << std::endl;
+  std::cout << "total gc time: " << gc_total << std::endl;
+  std::cout << "blob merge time: " << blob_merge_time << std::endl;
+  std::cout << "blob read time: " << blob_read_time << std::endl;
+  std::cout << "blob add time: " << blob_add_time << std::endl;
+  std::cout << "blob finish time; " << blob_finish_time << std::endl;
+  std::cout << "foreground blob add time; " << foreground_blob_add_time << std::endl;
+  std::cout << "foreground blob finish time: " << foreground_blob_finish_time <<std::endl;
   assert(column_family != nullptr);
   bool s = false;
   if (stats_.get() != nullptr) {
