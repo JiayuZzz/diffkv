@@ -386,7 +386,7 @@ void ForegroundBuilder::Finish() {
                           std::unique_ptr<BlobFileHandle>>>();
     for (auto &t : p) t.join();
     mutex_[0].unlock();
-    blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_);
+    blob_file_manager_->BatchFinishFiles(cf_id_, files);
   }
 
   Status ForegroundBuilder::FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
