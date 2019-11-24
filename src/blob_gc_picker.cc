@@ -48,12 +48,14 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
     if (!stop_picking) {
       blob_files.push_back(blob_file.get());
       batch_size += blob_file->file_size();
+      std::cerr<<"batch size add "<<blob_file->file_size()<<" size"<<std::endl;
       estimate_output_size +=
           (blob_file->file_size() - blob_file->discardable_size());
-      if (batch_size >= cf_options_.max_gc_batch_size ||
-          estimate_output_size >= cf_options_.blob_file_target_size) {
+      if (batch_size >= cf_options_.max_gc_batch_size /*||
+          estimate_output_size >= cf_options_.blob_file_target_size*/) {
         // Stop pick file for this gc, but still check file for whether need
         // trigger gc after this
+        std::cerr<<"stop picking"<<std::endl;
         stop_picking = true;
       }
     } else {
