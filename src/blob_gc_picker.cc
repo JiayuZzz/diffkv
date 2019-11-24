@@ -40,20 +40,22 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
       // or this file had been GCed
       ROCKS_LOG_INFO(db_options_.info_log, "Blob file %" PRIu64 " no need gc",
                      blob_file->file_number());
-      std::cerr<<"no need gc"<<std::endl;
-      if(!blob_file) std::cerr<<"no such file"<<std::endl;
+      // std::cerr<<"no need gc"<<std::endl;
+      // if(!blob_file) std::cerr<<"no such file"<<std::endl;
       if(!CheckBlobFile(blob_file.get())) std::cerr<<"check failed"<<std::endl;
       continue;
     }
     if (!stop_picking) {
       blob_files.push_back(blob_file.get());
       batch_size += blob_file->file_size();
+      // std::cerr<<"batch size add "<<blob_file->file_size()<<" size"<<std::endl;
       estimate_output_size +=
           (blob_file->file_size() - blob_file->discardable_size());
-      if (batch_size >= cf_options_.max_gc_batch_size ||
-          estimate_output_size >= cf_options_.blob_file_target_size) {
+      if (batch_size >= cf_options_.max_gc_batch_size /*||
+          estimate_output_size >= cf_options_.blob_file_target_size*/) {
         // Stop pick file for this gc, but still check file for whether need
         // trigger gc after this
+        // std::cerr<<"stop picking"<<std::endl;
         stop_picking = true;
       }
     } else {
@@ -74,9 +76,9 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
                   " bytes",
                   batch_size, estimate_output_size);
   if (blob_files.empty() || batch_size < cf_options_.min_gc_batch_size) {
-    std::cerr<<"first gc score"<<blob_storage->gc_score().front().score<<"score"<<std::endl;
-    if(batch_size<cf_options_.min_gc_batch_size) std::cerr<<"min batch"<<std::endl; 
-    if(blob_files.empty()) std::cerr<<"empty blob"<<std::endl;
+    // std::cerr<<"first gc score"<<blob_storage->gc_score().front().score<<"score"<<std::endl;
+    // if(batch_size<cf_options_.min_gc_batch_size) std::cerr<<"min batch"<<std::endl; 
+    // if(blob_files.empty()) std::cerr<<"empty blob"<<std::endl;
     return nullptr;
   }
   // if there is only one small file to merge, no need to perform
@@ -87,7 +89,7 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
           cf_options_.blob_file_discardable_ratio) {
     return nullptr;
   }
-  std::cerr<<"return "<<blob_files.size()<<"blob to gc"<<std::endl;
+  // std::cerr<<"return "<<blob_files.size()<<"blob to gc"<<std::endl;
   return std::unique_ptr<BlobGC>(new BlobGC(
       std::move(blob_files), std::move(cf_options_), maybe_continue_next_time));
 }

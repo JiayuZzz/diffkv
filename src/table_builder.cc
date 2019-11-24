@@ -45,7 +45,7 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
 
   if (ikey.type == kTypeBlobIndex &&
       cf_options_.blob_run_mode == TitanBlobRunMode::kFallback) {
-    std::cerr<<"fall back"<<std::endl;
+    // std::cerr<<"fall back"<<std::endl;
     // we ingest value from blob file
     Slice copy = value;
     BlobIndex index;
@@ -141,7 +141,7 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
           base_builder_->Add(index_key, index_value);
           return;
         } else {
-          std::cerr<<"not ok!"<<std::endl;
+          std::cerr<<"add blob not ok!"<<std::endl;
         }
       }
     }
