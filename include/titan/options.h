@@ -124,7 +124,7 @@ struct TitanCFOptions : public ColumnFamilyOptions {
   // The blob file size less than this option will be mark GC.
   //
   // Default: 8MB
-  uint64_t merge_small_file_threshold{8 << 20};
+  uint64_t merge_small_file_threshold{1 << 20};
 
   // The mode used to process blob file.
   //
