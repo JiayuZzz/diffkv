@@ -872,7 +872,7 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
         edit.DeleteBlobFile(file->file_number(),
                             db_impl_->GetLatestSequenceNumber());
       } else if (file->GetDiscardableRatio() >
-                 ((int)file->file_level() == 3
+                 ((int)file->file_level() == cf_options.num_levels - 1
                       ? cf_options.blob_file_discardable_ratio
                       : cf_options.high_level_blob_discardable_ratio)) {
         file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
@@ -1257,7 +1257,7 @@ void TitanDBImpl::OnCompactionCompleted(
                               db_impl_->GetLatestSequenceNumber());
           continue;
         } else if (file->file_type()==kSorted && static_cast<int>(file->file_level()) >=
-                       2 &&
+                       cf_options.num_levels - 2 &&
                    file->GetDiscardableRatio() >
                        cf_options.blob_file_discardable_ratio ) {
           file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
