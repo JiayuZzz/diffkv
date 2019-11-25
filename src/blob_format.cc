@@ -256,8 +256,8 @@ TitanInternalStats::StatsType BlobFileMeta::GetDiscardableRatioLevel() const {
              (ratio - 1.0) < std::numeric_limits<double>::epsilon()) {
     type = TitanInternalStats::NUM_DISCARDABLE_RATIO_LE100;
   } else {
-    fprintf(stderr, "invalid discardable ratio %.2f, file type %d\n",ratio, file_type_);
-    abort();
+    fprintf(stderr, "invalid discardable ratio %.2f, file type %d, file number %lu, file size %lu, discardable size %lu\n",ratio, file_type_, file_number_, file_size_, discardable_size_);
+    type = TitanInternalStats::NUM_DISCARDABLE_RATIO_LE100;
   }
   return type;
 }

@@ -204,10 +204,18 @@ void BlobStorage::ComputeGCScore() {
     // std::cerr<<"gc score is "<<gcs.score<<std::endl;
   }
 
+  if(cf_options_.blob_file_discardable_ratio == 0.01 && !cf_options_.level_merge){
+      std::sort(gc_score_.begin(), gc_score_.end(),
+            [](const GCScore& first, const GCScore& second) {
+              return first.file_number < second.file_number;
+            });
+  } else {
+
   std::sort(gc_score_.begin(), gc_score_.end(),
             [](const GCScore& first, const GCScore& second) {
               return first.score > second.score;
             });
+  }
 }
 
 }  // namespace titandb

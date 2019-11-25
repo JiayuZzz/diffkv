@@ -314,7 +314,7 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
   {
     TitanStopWatch swadd(env_, add_time);
     std::string k = key.ToString();
-    int b = hash(k)%num_builders_;
+    int b = num_builders_>1 ? hash(k)%num_builders_ : 0;
     mutex_[b].lock();
     if (value.size() < cf_options_.min_blob_size ||
         (cf_options_.level_merge && value.size() < cf_options_.mid_blob_size)) {
