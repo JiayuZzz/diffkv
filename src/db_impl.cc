@@ -171,8 +171,10 @@ TitanDBImpl::~TitanDBImpl() {
   std::cout << "blob read time: " << blob_read_time << std::endl;
   std::cout << "blob add time: " << blob_add_time << std::endl;
   std::cout << "blob finish time; " << blob_finish_time << std::endl;
-  std::cout << "foreground blob add time; " << foreground_blob_add_time << std::endl;
-  std::cout << "foreground blob finish time: " << foreground_blob_finish_time <<std::endl;
+  std::cout << "foreground blob add time; " << foreground_blob_add_time
+            << std::endl;
+  std::cout << "foreground blob finish time: " << foreground_blob_finish_time
+            << std::endl;
 }
 
 void TitanDBImpl::StartBackgroundTasks() {
@@ -1032,8 +1034,10 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
   std::cout << "blob read time: " << blob_read_time << std::endl;
   std::cout << "blob add time: " << blob_add_time << std::endl;
   std::cout << "blob finish time; " << blob_finish_time << std::endl;
-  std::cout << "foreground blob add time; " << foreground_blob_add_time << std::endl;
-  std::cout << "foreground blob finish time: " << foreground_blob_finish_time <<std::endl;
+  std::cout << "foreground blob add time; " << foreground_blob_add_time
+            << std::endl;
+  std::cout << "foreground blob finish time: " << foreground_blob_finish_time
+            << std::endl;
   assert(column_family != nullptr);
   bool s = false;
   if (stats_.get() != nullptr) {
@@ -1256,10 +1260,11 @@ void TitanDBImpl::OnCompactionCompleted(
           edit.DeleteBlobFile(file->file_number(),
                               db_impl_->GetLatestSequenceNumber());
           continue;
-        } else if (file->file_type()==kSorted && static_cast<int>(file->file_level()) >=
+        } else if (file->file_type() == kSorted &&
+                   static_cast<int>(file->file_level()) >=
                        cf_options.num_levels - 2 &&
                    file->GetDiscardableRatio() >
-                       cf_options.blob_file_discardable_ratio ) {
+                       cf_options.blob_file_discardable_ratio) {
           file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
         }
         if (count_sorted_run && file->file_type() == kSorted) {

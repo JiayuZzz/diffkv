@@ -40,6 +40,8 @@ struct TitanDBOptions : public DBOptions {
 
   bool sep_before_flush{false};
 
+  int num_foreground_builders{1};
+
   TitanDBOptions() = default;
   explicit TitanDBOptions(const DBOptions& options) : DBOptions(options) {}
 

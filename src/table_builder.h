@@ -109,45 +109,55 @@ class ForegroundBuilder {
                     std::shared_ptr<BlobFileManager> blob_file_manager,
                     const TitanDBOptions &db_options,
                     const TitanCFOptions &cf_options)
-      : cf_id_(cf_id),
+      : num_builders_(db_options.num_foreground_builders),
+        cf_id_(cf_id),
         blob_file_manager_(blob_file_manager),
         db_options_(db_options),
-        cf_options_(cf_options) {
+        cf_options_(cf_options),
+        handle_(db_options.num_foreground_builders),
+        builder_(db_options.num_foreground_builders),
+        pool(db_options.num_foreground_builders),
+        mutex_(db_options.num_foreground_builders),
+        keys_(db_options.num_foreground_builders),
+        discardable_(db_options.num_foreground_builders),
+        finished_files_(db_options.num_foreground_builders) {
     ResetBuilder();
   }
 
   ForegroundBuilder() = default;
 
  private:
+  int num_builders_;
   uint32_t cf_id_;
-  std::unique_ptr<BlobFileHandle> handle_;
-  std::unique_ptr<BlobFileBuilder> builder_;
   std::shared_ptr<BlobFileManager> blob_file_manager_;
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
-  std::vector<std::thread> pool{};
-  std::vector<std::mutex> mutex_{2};
-  std::unordered_map<std::string, uint64_t> keys_{};
-  uint64_t discardable_{0};
-      std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
-                          std::unique_ptr<BlobFileHandle>>>
-        finished_files_{};
+  std::vector<std::unique_ptr<BlobFileHandle>> handle_;
+  std::vector<std::unique_ptr<BlobFileBuilder>> builder_;
+  std::vector<std::vector<std::thread>> pool;
+  std::vector<std::mutex> mutex_;
+  std::vector<std::unordered_map<std::string, uint64_t>> keys_;
+  std::vector<uint64_t> discardable_;
+  std::vector<std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
+                                    std::unique_ptr<BlobFileHandle>>>>
+      finished_files_;
+  std::hash<std::string> hash{};
 
   void ResetBuilder() {
-    mutex_[0].lock();
-    handle_.reset();
-    builder_.reset();
-    keys_.clear();
-    discardable_ = 0;
-    for (auto &t : pool) t.join();
-    pool.clear();
-    finished_files_.clear();
-    mutex_[0].unlock();
+    for (int i = 0; i < num_builders_; i++) {
+      mutex_[i].lock();
+      handle_[i].reset();
+      builder_[i].reset();
+      keys_[i].clear();
+      discardable_[i] = 0;
+      for (auto &t : pool[i]) t.join();
+      pool[i].clear();
+      finished_files_.clear();
+      mutex_[i].unlock();
+    }
   }
 
-  Status FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
-                    std::unique_ptr<BlobFileBuilder> &&builder,
-                    uint64_t discardable);
+  Status FinishBlob(int b);
 };
 
 }  // namespace titandb

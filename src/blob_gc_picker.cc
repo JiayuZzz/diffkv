@@ -42,13 +42,15 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
                      blob_file->file_number());
       // std::cerr<<"no need gc"<<std::endl;
       // if(!blob_file) std::cerr<<"no such file"<<std::endl;
-      if(!CheckBlobFile(blob_file.get())) std::cerr<<"check failed"<<std::endl;
+      // if (!CheckBlobFile(blob_file.get()))
+        // std::cerr << "check failed" << std::endl;
       continue;
     }
     if (!stop_picking) {
       blob_files.push_back(blob_file.get());
       batch_size += blob_file->file_size();
-      // std::cerr<<"batch size add "<<blob_file->file_size()<<" size"<<std::endl;
+      // std::cerr<<"batch size add "<<blob_file->file_size()<<"
+      // size"<<std::endl;
       estimate_output_size +=
           (blob_file->file_size() - blob_file->discardable_size());
       if (batch_size >= cf_options_.max_gc_batch_size /*||
@@ -76,9 +78,11 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
                   " bytes",
                   batch_size, estimate_output_size);
   if (blob_files.empty() || batch_size < cf_options_.min_gc_batch_size) {
-    // std::cerr<<"first gc score"<<blob_storage->gc_score().front().score<<"score"<<std::endl;
-    // if(batch_size<cf_options_.min_gc_batch_size) std::cerr<<"min batch"<<std::endl; 
-    // if(blob_files.empty()) std::cerr<<"empty blob"<<std::endl;
+    // std::cerr<<"first gc
+    // score"<<blob_storage->gc_score().front().score<<"score"<<std::endl;
+    // if(batch_size<cf_options_.min_gc_batch_size) std::cerr<<"min
+    // batch"<<std::endl; if(blob_files.empty()) std::cerr<<"empty
+    // blob"<<std::endl;
     return nullptr;
   }
   // if there is only one small file to merge, no need to perform
@@ -98,9 +102,9 @@ bool BasicBlobGCPicker::CheckBlobFile(BlobFileMeta* blob_file) const {
   assert(blob_file == nullptr ||
          blob_file->file_state() != BlobFileMeta::FileState::kInit);
   if (blob_file == nullptr ||
-      blob_file->file_state() != BlobFileMeta::FileState::kNormal){
-    if(blob_file == nullptr){
-      std::cerr<<"check null blob file\n"<<std::endl;
+      blob_file->file_state() != BlobFileMeta::FileState::kNormal) {
+    if (blob_file == nullptr) {
+      std::cerr << "check null blob file\n" << std::endl;
     }
     return false;
   }

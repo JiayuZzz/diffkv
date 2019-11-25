@@ -15,7 +15,7 @@ std::atomic<uint64_t> blob_add_time{0};
 std::atomic<uint64_t> blob_finish_time{0};
 std::atomic<uint64_t> foreground_blob_add_time{0};
 std::atomic<uint64_t> foreground_blob_finish_time{0};
-//rocksdb::Env* env_ = rocksdb::Env::Default();
+// rocksdb::Env* env_ = rocksdb::Env::Default();
 // extern rocksdb::Env* env_;
 
 namespace rocksdb {
@@ -101,9 +101,9 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
       return;
     }
     // if (db_options_.sep_before_flush &&
-        // index.blob_handle.size >= cf_options_.mid_blob_size) {
-      // base_builder_->Add(key, value);
-      // return;
+    // index.blob_handle.size >= cf_options_.mid_blob_size) {
+    // base_builder_->Add(key, value);
+    // return;
     // }
     auto storage = blob_storage_.lock();
     assert(storage != nullptr);
@@ -114,7 +114,7 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
         std::unique_ptr<BlobFilePrefetcher> prefetcher;
         status_ = storage->NewPrefetcher(index.file_number, &prefetcher);
         if (!status_.ok()) {
-          std::cerr<<"create prefetcher error!"<<std::endl;
+          std::cerr << "create prefetcher error!" << std::endl;
           base_builder_->Add(key, value);
           return;
         }
@@ -141,7 +141,7 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
           base_builder_->Add(index_key, index_value);
           return;
         } else {
-          std::cerr<<"add blob not ok!"<<std::endl;
+          std::cerr << "add blob not ok!" << std::endl;
         }
       }
     }
@@ -307,113 +307,112 @@ void TitanTableBuilder::UpdateInternalOpStats() {
   }
 }
 
-Status ForegroundBuilder::Add(const Slice &key, const Slice &value, WriteBatch &wb) {
-    uint64_t add_time = 0;
-    Status s;
-    {
+Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
+                              WriteBatch& wb) {
+  uint64_t add_time = 0;
+  Status s;
+  {
     TitanStopWatch swadd(env_, add_time);
-    mutex_[0].lock();
+    int b = hash(key.ToString())%num_builders_;
+    mutex_[b].lock();
     std::string k = key.ToString();
     if (value.size() < cf_options_.min_blob_size ||
         (cf_options_.level_merge && value.size() < cf_options_.mid_blob_size)) {
-      auto iter = keys_.find(k);
-      if (iter == keys_.end()) {
+      auto iter = keys_[b].find(k);
+      if (iter == keys_[b].end()) {
       } else {
-        discardable_ += iter->second;
-        keys_.erase(iter);
+        discardable_[b] += iter->second;
+        keys_[b].erase(iter);
       }
-      mutex_[0].unlock();
+      mutex_[b].unlock();
       return Status::InvalidArgument();
     }
-    if (!handle_ && !builder_) {
-      s = blob_file_manager_->NewFile(&handle_);
+    if (!handle_[b] && !builder_[b]) {
+      s = blob_file_manager_->NewFile(&handle_[b]);
       if (!s.ok()) return s;
-      builder_ = std::unique_ptr<BlobFileBuilder>(
-          new BlobFileBuilder(db_options_, cf_options_, handle_->GetFile()));
+      builder_[b] = std::unique_ptr<BlobFileBuilder>(
+          new BlobFileBuilder(db_options_, cf_options_, handle_[b]->GetFile()));
     }
     BlobRecord blob_record;
     blob_record.key = key;
     blob_record.value = value;
     BlobIndex blob_index;
-    blob_index.file_number = handle_->GetNumber();
-    builder_->Add(blob_record, &blob_index.blob_handle);
-    auto iter = keys_.find(k);
-    if (iter == keys_.end()) {
-      keys_[k] = blob_index.blob_handle.size;
+    blob_index.file_number = handle_[b]->GetNumber();
+    builder_[b]->Add(blob_record, &blob_index.blob_handle);
+    auto iter = keys_[b].find(k);
+    if (iter == keys_[b].end()) {
+      keys_[b][k] = blob_index.blob_handle.size;
     } else {
-      discardable_ += iter->second;
+      discardable_[b] += iter->second;
       iter->second = blob_index.blob_handle.size;
     }
-    if (handle_->GetFile()->GetFileSize() >=
+    if (handle_[b]->GetFile()->GetFileSize() >=
         cf_options_.blob_file_target_size) {
       // pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
-                                //  std::move(handle_), std::move(builder_),
-                                //  discardable_));
-      FinishBlob(std::move(handle_), std::move(builder_), discardable_);
-      builder_.reset();
-      handle_.reset();
-      keys_.clear();
-      discardable_ = 0;
+      //  std::move(handle_), std::move(builder_),
+      //  discardable_));
+      FinishBlob(b);
+      builder_[b].reset();
+      handle_[b].reset();
+      keys_[b].clear();
+      discardable_[b] = 0;
     }
-    mutex_[0].unlock();
+    mutex_[b].unlock();
     std::string index_entry;
     blob_index.EncodeTo(&index_entry);
 
     s = WriteBatchInternal::PutBlobIndex(&wb, cf_id_, blob_record.key,
                                          index_entry);
-    }
-    foreground_blob_add_time += add_time;
-    return s;
   }
+  foreground_blob_add_time += add_time;
+  return s;
+}
 
 void ForegroundBuilder::Finish() {
-    std::vector<std::thread> p(2);
-    std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
-                          std::unique_ptr<BlobFileHandle>>> files;
-    mutex_[0].lock();
-    // pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
-                              //  std::move(handle_), std::move(builder_),
-                              //  discardable_));
-    FinishBlob(std::move(handle_), std::move(builder_), discardable_);
-    builder_.reset();
-    handle_.reset();
-    keys_.clear();
-    discardable_ = 0;
-    p = std::move(pool);
-    pool = std::vector<std::thread>();
-    files = std::move(finished_files_);
-    finished_files_ = std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
-                          std::unique_ptr<BlobFileHandle>>>();
-    for (auto &t : p) t.join();
-    mutex_[0].unlock();
-    blob_file_manager_->BatchFinishFiles(cf_id_, files);
+  for(int i=0;i<num_builders_;i++){
+  std::vector<std::thread> p(2);
+  std::vector<
+      std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>>
+      files;
+  mutex_[i].lock();
+  // pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
+  //  std::move(handle_), std::move(builder_),
+  //  discardable_));
+  FinishBlob(i);
+  builder_[i].reset();
+  handle_[i].reset();
+  keys_[i].clear();
+  discardable_[i] = 0;
+  files = std::move(finished_files_[i]);
+  finished_files_[i] = std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
+                                          std::unique_ptr<BlobFileHandle>>>();
+  for (auto& t : pool[i]) t.join();
+  pool[i].clear();
+  mutex_[i].unlock();
+  blob_file_manager_->BatchFinishFiles(cf_id_, files);
   }
+}
 
-  Status ForegroundBuilder::FinishBlob(std::unique_ptr<BlobFileHandle> &&handle,
-                    std::unique_ptr<BlobFileBuilder> &&builder,
-                    uint64_t discardable) {
-    uint64_t finish_time = 0;
-    Status s;
-    {
+Status ForegroundBuilder::FinishBlob(int b) {
+  uint64_t finish_time = 0;
+  Status s;
+  {
     TitanStopWatch sw(env_, finish_time);
-    std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
-                          std::unique_ptr<BlobFileHandle>>>
-        files;
-    if (!builder && !handle) return s;
-    s = builder->Finish();
+    if (!builder_[b] && !handle_[b]) return s;
+    s = builder_[b]->Finish();
     if (s.ok()) {
       auto file = std::make_shared<BlobFileMeta>(
-          handle->GetNumber(), handle->GetFile()->GetFileSize(),
-          builder->NumEntries(), 0, builder->GetSmallestKey(),
-          builder->GetLargestKey(), kUnSorted);
+          handle_[b]->GetNumber(), handle_[b]->GetFile()->GetFileSize(),
+          builder_[b]->NumEntries(), 0, builder_[b]->GetSmallestKey(),
+          builder_[b]->GetLargestKey(), kUnSorted);
       file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
-      file->AddDiscardableSize(discardable);
-      finished_files_.emplace_back(std::make_pair(file, std::move(handle)));
+      file->AddDiscardableSize(discardable_[b]);
+      finished_files_[b].emplace_back(std::make_pair(file, std::move(handle_[b])));
     }
-    }
-    foreground_blob_finish_time += finish_time;
-    return s;
   }
+  foreground_blob_finish_time += finish_time;
+  return s;
+}
 
 }  // namespace titandb
 }  // namespace rocksdb

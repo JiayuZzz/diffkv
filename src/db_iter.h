@@ -32,7 +32,7 @@ class TitanDBIterator : public Iterator {
         stats_(stats),
         info_log_(info_log) {}
 
-  bool Valid() const override { return iter_->Valid(); /*&& status_.ok(); */}
+  bool Valid() const override { return iter_->Valid(); /*&& status_.ok(); */ }
 
   Status status() const override {
     // assume volatile inner iter
