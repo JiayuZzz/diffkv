@@ -405,6 +405,7 @@ Status ForegroundBuilder::FinishBlob(int b) {
           handle_[b]->GetNumber(), handle_[b]->GetFile()->GetFileSize(),
           builder_[b]->NumEntries(), 0, builder_[b]->GetSmallestKey(),
           builder_[b]->GetLargestKey(), kUnSorted);
+      std::cerr<<"finish file size "<<handle_[b]->GetFile()->GetFileSize()<<" discardable size "<<discardable_[b]<<" file "<<file->file_number()<<std::endl;
       file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
       file->AddDiscardableSize(discardable_[b]);
       finished_files_[b].emplace_back(std::make_pair(file, std::move(handle_[b])));
