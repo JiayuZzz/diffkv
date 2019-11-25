@@ -352,10 +352,12 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
       //  std::move(handle_), std::move(builder_),
       //  discardable_));
       FinishBlob(b);
+      /*
       builder_[b].reset();
       handle_[b].reset();
       keys_[b].clear();
       discardable_[b] = 0;
+      */
     }
     mutex_[b].unlock();
     std::string index_entry;
@@ -370,7 +372,6 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
 
 void ForegroundBuilder::Finish() {
   for(int i=0;i<num_builders_;i++){
-  std::vector<std::thread> p(2);
   std::vector<
       std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>>
       files;
@@ -379,15 +380,17 @@ void ForegroundBuilder::Finish() {
   //  std::move(handle_), std::move(builder_),
   //  discardable_));
   FinishBlob(i);
+  /*
   builder_[i].reset();
   handle_[i].reset();
   keys_[i].clear();
   discardable_[i] = 0;
+  */
   files = std::move(finished_files_[i]);
   finished_files_[i] = std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
                                           std::unique_ptr<BlobFileHandle>>>();
-  for (auto& t : pool[i]) t.join();
-  pool[i].clear();
+  // for (auto& t : pool[i]) t.join();
+  // pool[i].clear();
   mutex_[i].unlock();
   blob_file_manager_->BatchFinishFiles(cf_id_, files);
   }
@@ -406,10 +409,21 @@ Status ForegroundBuilder::FinishBlob(int b) {
           builder_[b]->NumEntries(), 0, builder_[b]->GetSmallestKey(),
           builder_[b]->GetLargestKey(), kUnSorted);
       std::cerr<<"finish file size "<<handle_[b]->GetFile()->GetFileSize()<<" discardable size "<<discardable_[b]<<" file "<<file->file_number()<<std::endl;
+      if(file->GetDiscardableRatio()>1) {
+        std::cerr<<"ratio "<<file->GetDiscardableRatio()<<std::endl;
+        abort();
+      }
       file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
       file->AddDiscardableSize(discardable_[b]);
       finished_files_[b].emplace_back(std::make_pair(file, std::move(handle_[b])));
+    } else {
+      std::cerr<<"finish failed"<<std::endl;
+      abort();
     }
+    builder_[b].reset();
+    handle_[b].reset();
+    keys_[b].clear();
+    discardable_[b] = 0;
   }
   foreground_blob_finish_time += finish_time;
   return s;
