@@ -313,9 +313,9 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
   Status s;
   {
     TitanStopWatch swadd(env_, add_time);
-    int b = hash(key.ToString())%num_builders_;
-    mutex_[b].lock();
     std::string k = key.ToString();
+    int b = hash(k)%num_builders_;
+    mutex_[b].lock();
     if (value.size() < cf_options_.min_blob_size ||
         (cf_options_.level_merge && value.size() < cf_options_.mid_blob_size)) {
       auto iter = keys_[b].find(k);
@@ -332,6 +332,8 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
       if (!s.ok()) return s;
       builder_[b] = std::unique_ptr<BlobFileBuilder>(
           new BlobFileBuilder(db_options_, cf_options_, handle_[b]->GetFile()));
+      keys_[b].clear();
+      discardable_[b] = 0;
     }
     BlobRecord blob_record;
     blob_record.key = key;
@@ -372,9 +374,9 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
 
 void ForegroundBuilder::Finish() {
   for(int i=0;i<num_builders_;i++){
-  std::vector<
-      std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>>
-      files;
+  // std::vector<
+      // std::pair<std::shared_ptr<BlobFileMeta>, std::unique_ptr<BlobFileHandle>>>
+      // files;
   mutex_[i].lock();
   // pool.push_back(std::thread(&ForegroundBuilder::FinishBlob, this,
   //  std::move(handle_), std::move(builder_),
@@ -386,13 +388,15 @@ void ForegroundBuilder::Finish() {
   keys_[i].clear();
   discardable_[i] = 0;
   */
-  files = std::move(finished_files_[i]);
-  finished_files_[i] = std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
-                                          std::unique_ptr<BlobFileHandle>>>();
+  // files = std::move(finished_files_[i]);
+  blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_[i]);
+  finished_files_.clear();
+  // finished_files_[i] = std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
+                                          // std::unique_ptr<BlobFileHandle>>>();
   // for (auto& t : pool[i]) t.join();
   // pool[i].clear();
   mutex_[i].unlock();
-  blob_file_manager_->BatchFinishFiles(cf_id_, files);
+  // blob_file_manager_->BatchFinishFiles(cf_id_, files);
   }
 }
 
