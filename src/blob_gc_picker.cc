@@ -98,8 +98,12 @@ bool BasicBlobGCPicker::CheckBlobFile(BlobFileMeta* blob_file) const {
   assert(blob_file == nullptr ||
          blob_file->file_state() != BlobFileMeta::FileState::kInit);
   if (blob_file == nullptr ||
-      blob_file->file_state() != BlobFileMeta::FileState::kNormal)
+      blob_file->file_state() != BlobFileMeta::FileState::kNormal){
+    if(blob_file == nullptr){
+      std::cerr<<"check null blob file\n"<<std::endl;
+    }
     return false;
+  }
 
   return true;
 }
