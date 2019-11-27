@@ -1,9 +1,14 @@
 #include "blob_storage.h"
 #include "blob_file_set.h"
 #include "iostream"
+#include "atomic"
+
+std::atomic<uint64_t> compute_gc_score{0};
 
 namespace rocksdb {
 namespace titandb {
+
+extern Env* env_;
 
 Status BlobStorage::Get(const ReadOptions& options, const BlobIndex& index,
                         BlobRecord* record, PinnableSlice* buffer) {
@@ -181,6 +186,9 @@ void BlobStorage::GetObsoleteFiles(std::vector<std::string>* obsolete_files,
 void BlobStorage::ComputeGCScore() {
   // TODO: no need to recompute all everytime
   MutexLock l(&mutex_);
+  uint64_t start = 0;
+  {
+  TitanStopWatch sw(env_, start);
   gc_score_.clear();
 
   for (auto& file : files_) {
@@ -216,6 +224,8 @@ void BlobStorage::ComputeGCScore() {
               return first.score > second.score;
             });
   }
+  }
+  compute_gc_score += start;
 }
 
 }  // namespace titandb

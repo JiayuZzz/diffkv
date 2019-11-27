@@ -33,6 +33,7 @@ extern std::atomic<uint64_t> blob_add_time;
 extern std::atomic<uint64_t> blob_finish_time;
 extern std::atomic<uint64_t> foreground_blob_add_time;
 extern std::atomic<uint64_t> foreground_blob_finish_time;
+extern std::atomic<uint64_t> compute_gc_score;
 
 namespace rocksdb {
 namespace titandb {
@@ -167,6 +168,7 @@ TitanDBImpl::~TitanDBImpl() {
   std::cout << "gc read lsm time: " << gc_read_lsm << std::endl;
   std::cout << "gc sample time: " << gc_sample << std::endl;
   std::cout << "total gc time: " << gc_total << std::endl;
+  std::cout << "compute gc score time: " << compute_gc_score << std::endl;
   std::cout << "blob merge time: " << blob_merge_time << std::endl;
   std::cout << "blob read time: " << blob_read_time << std::endl;
   std::cout << "blob add time: " << blob_add_time << std::endl;
@@ -1030,6 +1032,7 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
   std::cout << "gc read lsm time: " << gc_read_lsm << std::endl;
   std::cout << "gc sample time: " << gc_sample << std::endl;
   std::cout << "total gc time: " << gc_total << std::endl;
+  std::cout << "compute gc score time: " << compute_gc_score << std::endl;
   std::cout << "blob merge time: " << blob_merge_time << std::endl;
   std::cout << "blob read time: " << blob_read_time << std::endl;
   std::cout << "blob add time: " << blob_add_time << std::endl;
