@@ -386,13 +386,18 @@ Status ForegroundBuilder::FinishBlob(int b) {
           builder_[b]->NumEntries(), 0, builder_[b]->GetSmallestKey(),
           builder_[b]->GetLargestKey(), kUnSorted);
       // std::cerr<<"finish file size "<<handle_[b]->GetFile()->GetFileSize()<<" discardable size "<<discardable_[b]<<" file "<<file->file_number()<<std::endl;
+      file->AddDiscardableSize(discardable_[b]);
       if(file->GetDiscardableRatio()>1) {
         std::cerr<<"ratio "<<file->GetDiscardableRatio()<<std::endl;
         abort();
       }
-      file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
-      file->AddDiscardableSize(discardable_[b]);
-      finished_files_[b].emplace_back(std::make_pair(file, std::move(handle_[b])));
+      if(file->NoLiveData()){
+        std::cerr<<"delete file "<<file->file_number()<<std::endl;
+        env_->DeleteFile(BlobFileName(db_options_.dirname, file->file_number()));
+      } else {
+        file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
+        finished_files_[b].emplace_back(std::make_pair(file, std::move(handle_[b])));
+      }
     } else {
       std::cerr<<"finish failed"<<std::endl;
       abort();
