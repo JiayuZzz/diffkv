@@ -160,11 +160,15 @@ class EditCollector {
           return Status::Corruption("Blob file " + ToString(number) +
                                     " doesn't exist before");
         } else if (blob->is_obsolete()) {
+          static cnt = 0;
+          std::cerr<<"Blob file " + ToString(number) +
+                                    " has been deleted already, cnt"<<++cnt<<std::endl;
           ROCKS_LOG_ERROR(storage->db_options().info_log,
                           "blob file %" PRIu64 " has been deleted already\n",
                           number);
-          return Status::Corruption("Blob file " + ToString(number) +
-                                    " has been deleted already");
+          continue;
+          // return Status::Corruption("Blob file " + ToString(number) +
+                                    // " has been deleted already");
         }
       }
 
