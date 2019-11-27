@@ -164,12 +164,11 @@ class EditCollector {
           static int cnt;
           std::cerr<<"Blob file " + ToString(number) +
                                     " has been deleted already cnt "<<++cnt<<" times."<<std::endl;
-          continue;
-          // ROCKS_LOG_ERROR(storage->db_options().info_log,
-                          // "blob file %" PRIu64 " has been deleted already\n",
-                          // number);
-          // return Status::Corruption("Blob file " + ToString(number) +
-                                    // " has been deleted already");
+          ROCKS_LOG_ERROR(storage->db_options().info_log,
+                          "blob file %" PRIu64 " has been deleted already\n",
+                          number);
+          return Status::Corruption("Blob file " + ToString(number) +
+                                    " has been deleted already");
         }
       }
 

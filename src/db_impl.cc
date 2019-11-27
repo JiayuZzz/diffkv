@@ -1259,7 +1259,7 @@ void TitanDBImpl::OnCompactionCompleted(
         // new blob files. Delete blob files which have no live data.
         // Mark last two level blob files to merge in next compaction if
         // discardable size reached GC threshold
-        if (file->NoLiveData()) {
+        if (file->NoLiveData()&&file->file_type()==kSorted) {
           edit.DeleteBlobFile(file->file_number(),
                               db_impl_->GetLatestSequenceNumber());
           continue;
