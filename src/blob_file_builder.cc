@@ -25,10 +25,10 @@ void BlobFileBuilder::Add(const BlobRecord& record, BlobHandle* handle) {
   handle->offset = file_->GetFileSize();
   handle->size = encoder_.GetEncodedSize();
 
-  status_ = file_->Append(encoder_.GetHeader());
+  status_ = file_->Append(encoder_.GetHeader().ToString()+encoder_.GetRecord().ToString());
   if (ok()) {
     bytes_written += handle->size;
-    status_ = file_->Append(encoder_.GetRecord());
+    // status_ = file_->Append(encoder_.GetRecord());
     num_entries_++;
     // The keys added into blob files are in order.
     if (smallest_key_.empty()) {

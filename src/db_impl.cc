@@ -43,16 +43,20 @@ class TitanDBImpl::FileManager : public BlobFileManager {
   FileManager(TitanDBImpl* db) : db_(db) {}
 
   Status NewFile(std::unique_ptr<BlobFileHandle>* handle) override {
-    auto number = db_->blob_file_set_->NewFileNumber();
+    return NewFile(handle, db_->env_options_);
+  }
+
+  Status NewFile(std::unique_ptr<BlobFileHandle>* handle, const EnvOptions& options) override {
+        auto number = db_->blob_file_set_->NewFileNumber();
     auto name = BlobFileName(db_->dirname_, number);
 
     Status s;
     std::unique_ptr<WritableFileWriter> file;
     {
       std::unique_ptr<WritableFile> f;
-      s = db_->env_->NewWritableFile(name, &f, db_->env_options_);
+      s = db_->env_->NewWritableFile(name, &f, options);
       if (!s.ok()) return s;
-      file.reset(new WritableFileWriter(std::move(f), name, db_->env_options_));
+      file.reset(new WritableFileWriter(std::move(f), name, options));
     }
 
     handle->reset(new FileHandle(number, name, std::move(file)));

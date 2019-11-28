@@ -28,6 +28,10 @@ class BlobFileManager {
   // If successful, sets "*handle* to the new file handle.
   virtual Status NewFile(std::unique_ptr<BlobFileHandle>* handle) = 0;
 
+  virtual Status NewFile(std::unique_ptr<BlobFileHandle>* handle, const EnvOptions& option){
+    return NewFile(handle);
+  }
+
   // Finishes the file with the provided metadata. Stops writting to
   // the file anymore.
   // REQUIRES: FinishFile(), DeleteFile() have not been called.

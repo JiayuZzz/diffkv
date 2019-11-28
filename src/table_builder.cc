@@ -328,7 +328,7 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
       return Status::InvalidArgument();
     }
     if (!handle_[b] && !builder_[b]) {
-      s = blob_file_manager_->NewFile(&handle_[b]);
+      s = blob_file_manager_->NewFile(&handle_[b], env_options_);
       if (!s.ok()) return s;
       builder_[b] = std::unique_ptr<BlobFileBuilder>(
           new BlobFileBuilder(db_options_, cf_options_, handle_[b]->GetFile()));

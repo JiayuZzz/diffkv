@@ -116,6 +116,7 @@ class ForegroundBuilder {
         blob_storage_(blob_storage),
         db_options_(db_options),
         cf_options_(cf_options),
+        env_options_(db_options_),
         handle_(db_options.num_foreground_builders),
         builder_(db_options.num_foreground_builders),
         pool(db_options.num_foreground_builders),
@@ -124,6 +125,7 @@ class ForegroundBuilder {
         discardable_(db_options.num_foreground_builders),
         finished_files_(db_options.num_foreground_builders) {
     ResetBuilder();
+    env_options_.writable_file_max_buffer_size = 4096;
   }
 
   ForegroundBuilder() = default;
@@ -135,6 +137,7 @@ class ForegroundBuilder {
   std::weak_ptr<BlobStorage> blob_storage_;
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
+  EnvOptions env_options_;
   std::vector<std::unique_ptr<BlobFileHandle>> handle_;
   std::vector<std::unique_ptr<BlobFileBuilder>> builder_;
   std::vector<std::vector<std::thread>> pool;
