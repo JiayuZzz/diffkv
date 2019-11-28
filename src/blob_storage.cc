@@ -13,12 +13,45 @@ extern Env* env_;
 Status BlobStorage::Get(const ReadOptions& options, const BlobIndex& index,
                         BlobRecord* record, PinnableSlice* buffer) {
   auto sfile = FindFile(index.file_number).lock();
-  if (!sfile)
+  if (!sfile){
+    if (db_options_.sep_before_flush) {
+      return ReadBuildingFile(options, index, record);
+    }
     return Status::Corruption("Missing blob file: " +
                               std::to_string(index.file_number));
+  }
   return file_cache_->Get(options, sfile->file_number(), sfile->file_size(),
                           index.blob_handle, record, buffer);
 }
+
+Status BlobStorage::ReadBuildingFile(const ReadOptions& options, const BlobIndex& index,
+             BlobRecord* record){
+    auto reader = FindBuildingFile(index.file_number).lock();
+    if(!reader){
+      return Status::Corruption("File " + std::to_string(index.file_number)+" not exist");
+    }
+    Slice blob;
+    OwnedSlice buffer;
+    CacheAllocationPtr ubuf(new char[index.blob_handle.size]);
+    auto s = reader->Read(index.blob_handle.offset, index.blob_handle.size, &blob, ubuf.get());
+    if(!s.ok()) {
+      return s;
+    }
+    if (index.blob_handle.size!=static_cast<uint64_t>(blob.size())) {
+          return Status::Corruption(
+        "ReadRecord actual size: " + ToString(blob.size()) +
+        " not equal to blob size " + ToString(index.blob_handle.size));
+    }
+
+    BlobDecoder decoder;
+    s = decoder.DecodeHeader(&blob);
+    if (!s.ok()) {
+      return s;
+    }
+    buffer.reset(std::move(ubuf), blob);
+    s = decoder.DecodeRecord(&blob, record, &buffer);
+    return s;
+  }
 
 Status BlobStorage::NewPrefetcher(uint64_t file_number,
                                   std::unique_ptr<BlobFilePrefetcher>* result) {
@@ -83,6 +116,15 @@ std::weak_ptr<BlobFileMeta> BlobStorage::FindFile(uint64_t file_number) const {
   return std::weak_ptr<BlobFileMeta>();
 }
 
+std::weak_ptr<RandomAccessFileReader> BlobStorage::FindBuildingFile(uint64_t file_number) const {
+  MutexLock l(&mutex_);
+  auto it = building_files_.find(file_number);
+  if (it != building_files_.end()) {
+    return it->second;
+  }
+  return std::weak_ptr<RandomAccessFileReader>();
+}
+
 void BlobStorage::ExportBlobFiles(
     std::map<uint64_t, std::weak_ptr<BlobFileMeta>>& ret) const {
   MutexLock l(&mutex_);
@@ -98,6 +140,27 @@ void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta>& file) {
   AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_FILE_SIZE,
            file->file_size());
   AddStats(stats_, cf_id_, TitanInternalStats::NUM_LIVE_BLOB_FILE, 1);
+  if(db_options_.sep_before_flush){
+    building_files_.erase(file->file_number());
+  }
+}
+
+Status BlobStorage::AddBuildingFile(uint64_t file_number) {
+  std::shared_ptr<RandomAccessFileReader> reader;
+  Status s;
+  {
+  std::unique_ptr<RandomAccessFile> file;
+  auto file_name = BlobFileName(db_options_.dirname, file_number);
+  s = env_->NewRandomAccessFile(file_name, &file, env_options_);
+  if(!s.ok()) return s;
+  if (db_options_.advise_random_on_open) {
+    file->Hint(RandomAccessFile::RANDOM);
+  }
+  reader.reset(new RandomAccessFileReader(std::move(file), file_name));
+  }
+  MutexLock l(&mutex_);
+  building_files_.emplace(std::make_pair(file_number, reader));
+  return s;
 }
 
 bool BlobStorage::MarkFileObsolete(uint64_t file_number,

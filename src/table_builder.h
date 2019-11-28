@@ -107,11 +107,13 @@ class ForegroundBuilder {
 
   ForegroundBuilder(uint32_t cf_id,
                     std::shared_ptr<BlobFileManager> blob_file_manager,
+                    std::weak_ptr<BlobStorage> blob_storage,
                     const TitanDBOptions &db_options,
                     const TitanCFOptions &cf_options)
       : num_builders_(db_options.num_foreground_builders),
         cf_id_(cf_id),
         blob_file_manager_(blob_file_manager),
+        blob_storage_(blob_storage),
         db_options_(db_options),
         cf_options_(cf_options),
         handle_(db_options.num_foreground_builders),
@@ -130,6 +132,7 @@ class ForegroundBuilder {
   int num_builders_;
   uint32_t cf_id_;
   std::shared_ptr<BlobFileManager> blob_file_manager_;
+  std::weak_ptr<BlobStorage> blob_storage_;
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
   std::vector<std::unique_ptr<BlobFileHandle>> handle_;

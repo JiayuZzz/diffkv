@@ -270,9 +270,9 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
                            {cf_name, ImmutableTitanCFOptions(descs[i].options),
                             MutableTitanCFOptions(descs[i].options),
                             base_table_factory, titan_table_factory}));
-      builders_.emplace(cf_id,
-                        ForegroundBuilder(cf_id, blob_manager_, db_options_,
-                                          descs[i].options));
+      // builders_.emplace(cf_id,
+                        // ForegroundBuilder(cf_id, blob_manager_,blob_file_set_->GetBlobStorage(cf_id) ,db_options_,
+                                          // descs[i].options));
       base_descs[i].options.table_factory = titan_table_factory;
       // Add TableProperties for collecting statistics GC
       base_descs[i].options.table_properties_collector_factories.emplace_back(
@@ -290,6 +290,9 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
   }
 
   s = blob_file_set_->Open(column_families);
+  for(auto cf:column_families){
+    builders_.emplace(cf.first, ForegroundBuilder(cf.first, blob_manager_, blob_file_set_->GetBlobStorage(cf.first), db_options_,cf.second));
+  }
   if (!s.ok()) return s;
 
   // Initialize GC thread pool.

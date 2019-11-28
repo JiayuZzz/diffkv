@@ -332,6 +332,12 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
       if (!s.ok()) return s;
       builder_[b] = std::unique_ptr<BlobFileBuilder>(
           new BlobFileBuilder(db_options_, cf_options_, handle_[b]->GetFile()));
+      auto storage = blob_storage_.lock();
+      if(!storage){
+        std::cerr<<"no storage!"<<std::endl;
+        abort();
+      }
+      storage->AddBuildingFile(handle_[b]->GetNumber());
       keys_[b].clear();
       discardable_[b] = 0;
     }

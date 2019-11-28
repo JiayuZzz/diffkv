@@ -21,6 +21,7 @@ class BlobStorage {
     this->file_cache_ = bs.file_cache_;
     this->db_options_ = bs.db_options_;
     this->cf_options_ = bs.cf_options_;
+    this->env_options_ = bs.env_options_;
     this->cf_id_ = bs.cf_id_;
     this->stats_ = bs.stats_;
   }
@@ -30,6 +31,7 @@ class BlobStorage {
               std::shared_ptr<BlobFileCache> _file_cache, TitanStats* stats)
       : db_options_(_db_options),
         cf_options_(_cf_options),
+        env_options_(_db_options),
         cf_id_(cf_id),
         blob_ranges_(InternalComparator(_cf_options.comparator)),
         file_cache_(_file_cache),
@@ -69,6 +71,8 @@ class BlobStorage {
   // corruption if the file doesn't exist.
   std::weak_ptr<BlobFileMeta> FindFile(uint64_t file_number) const;
 
+  std::weak_ptr<RandomAccessFileReader> FindBuildingFile(uint64_t file_number) const;
+
   // Marks all the blob files so that they can be picked by GC job.
   void MarkAllFilesForGC() {
     MutexLock l(&mutex_);
@@ -99,6 +103,8 @@ class BlobStorage {
   // Add a new blob file to this blob storage.
   void AddBlobFile(std::shared_ptr<BlobFileMeta>& file);
 
+  Status AddBuildingFile(uint64_t file_number);
+
   // Gets all obsolete blob files whose obsolete_sequence is smaller than the
   // oldest_sequence. Note that the files returned would be erased from internal
   // structure, so for the next call, the files returned before wouldn't be
@@ -127,6 +133,9 @@ class BlobStorage {
   void ExportBlobFiles(
       std::map<uint64_t, std::weak_ptr<BlobFileMeta>>& ret) const;
 
+  Status ReadBuildingFile(const ReadOptions& options, const BlobIndex& index,
+             BlobRecord* record);
+
  private:
   friend class BlobFileSet;
   friend class VersionTest;
@@ -140,12 +149,15 @@ class BlobStorage {
 
   TitanDBOptions db_options_;
   TitanCFOptions cf_options_;
+  EnvOptions env_options_;
   uint32_t cf_id_;
 
   mutable port::Mutex mutex_;
 
   // Only BlobStorage OWNS BlobFileMeta
   std::unordered_map<uint64_t, std::shared_ptr<BlobFileMeta>> files_;
+
+  std::unordered_map<uint64_t, std::shared_ptr<RandomAccessFileReader>> building_files_;
 
   class InternalComparator {
    public:
