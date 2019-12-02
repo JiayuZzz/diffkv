@@ -4423,7 +4423,7 @@ int main(int argc, char** argv) {
   // max number of concurrent compactions.
   FLAGS_env->SetBackgroundThreads(FLAGS_max_background_compactions);
   FLAGS_env->SetBackgroundThreads(FLAGS_num_bottom_pri_threads,
-                                  rocksdb::Env::Priority::BOTTOM);
+                                  rocksdb::Env::Priority::USER);
   if (FLAGS_prefixpercent > 0 && FLAGS_prefix_size <= 0) {
     fprintf(stderr,
             "Error: prefixpercent is non-zero while prefix_size is "

@@ -6493,7 +6493,7 @@ int db_bench_tool(int argc, char** argv) {
   FLAGS_env->SetBackgroundThreads(FLAGS_num_high_pri_threads,
                                   rocksdb::Env::Priority::HIGH);
   FLAGS_env->SetBackgroundThreads(FLAGS_num_bottom_pri_threads,
-                                  rocksdb::Env::Priority::BOTTOM);
+                                  rocksdb::Env::Priority::USER);
   FLAGS_env->SetBackgroundThreads(FLAGS_num_low_pri_threads,
                                   rocksdb::Env::Priority::LOW);
 
