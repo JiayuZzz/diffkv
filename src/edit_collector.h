@@ -162,8 +162,9 @@ class EditCollector {
                                     " doesn't exist before");
         } else if (blob->is_obsolete()) {
           static int cnt;
-          std::cerr<<"Blob file " + ToString(number) +
-                                    " has been deleted already cnt "<<++cnt<<" times."<<std::endl;
+          std::cerr << "Blob file " + ToString(number) +
+                           " has been deleted already cnt "
+                    << ++cnt << " times." << std::endl;
           ROCKS_LOG_ERROR(storage->db_options().info_log,
                           "blob file %" PRIu64 " has been deleted already\n",
                           number);

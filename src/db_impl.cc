@@ -46,8 +46,9 @@ class TitanDBImpl::FileManager : public BlobFileManager {
     return NewFile(handle, db_->env_options_);
   }
 
-  Status NewFile(std::unique_ptr<BlobFileHandle>* handle, const EnvOptions& options) override {
-        auto number = db_->blob_file_set_->NewFileNumber();
+  Status NewFile(std::unique_ptr<BlobFileHandle>* handle,
+                 const EnvOptions& options) override {
+    auto number = db_->blob_file_set_->NewFileNumber();
     auto name = BlobFileName(db_->dirname_, number);
 
     Status s;
@@ -167,20 +168,23 @@ TitanDBImpl::~TitanDBImpl() {
   for (auto& builder : builders_) builder.second.Finish();
   PurgeObsoleteFiles();
   Close();
-  std::cout << "blob builder written bytes: " << bytes_written/1000000.0 << std::endl;
-  std::cout << "gc update lsm time: " << gc_update_lsm/1000000.0 << std::endl;
-  std::cout << "gc read lsm time: " << gc_read_lsm/1000000.0 << std::endl;
-  std::cout << "gc sample time: " << gc_sample/1000000.0 << std::endl;
-  std::cout << "total gc time: " << gc_total/1000000.0 << std::endl;
-  std::cout << "compute gc score time: " << compute_gc_score/1000000.0 << std::endl;
-  std::cout << "blob merge time: " << blob_merge_time/1000000.0 << std::endl;
-  std::cout << "blob read time: " << blob_read_time/1000000.0 << std::endl;
-  std::cout << "blob add time: " << blob_add_time/1000000.0 << std::endl;
-  std::cout << "blob finish time; " << blob_finish_time/1000000.0 << std::endl;
-  std::cout << "foreground blob add time; " << foreground_blob_add_time/1000000.0
+  std::cout << "blob builder written bytes: " << bytes_written / 1000000.0
             << std::endl;
-  std::cout << "foreground blob finish time: " << foreground_blob_finish_time/1000000.0
+  std::cout << "gc update lsm time: " << gc_update_lsm / 1000000.0 << std::endl;
+  std::cout << "gc read lsm time: " << gc_read_lsm / 1000000.0 << std::endl;
+  std::cout << "gc sample time: " << gc_sample / 1000000.0 << std::endl;
+  std::cout << "total gc time: " << gc_total / 1000000.0 << std::endl;
+  std::cout << "compute gc score time: " << compute_gc_score / 1000000.0
             << std::endl;
+  std::cout << "blob merge time: " << blob_merge_time / 1000000.0 << std::endl;
+  std::cout << "blob read time: " << blob_read_time / 1000000.0 << std::endl;
+  std::cout << "blob add time: " << blob_add_time / 1000000.0 << std::endl;
+  std::cout << "blob finish time; " << blob_finish_time / 1000000.0
+            << std::endl;
+  std::cout << "foreground blob add time; "
+            << foreground_blob_add_time / 1000000.0 << std::endl;
+  std::cout << "foreground blob finish time: "
+            << foreground_blob_finish_time / 1000000.0 << std::endl;
 }
 
 void TitanDBImpl::StartBackgroundTasks() {
@@ -275,8 +279,9 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
                             MutableTitanCFOptions(descs[i].options),
                             base_table_factory, titan_table_factory}));
       // builders_.emplace(cf_id,
-                        // ForegroundBuilder(cf_id, blob_manager_,blob_file_set_->GetBlobStorage(cf_id) ,db_options_,
-                                          // descs[i].options));
+      // ForegroundBuilder(cf_id,
+      // blob_manager_,blob_file_set_->GetBlobStorage(cf_id) ,db_options_,
+      // descs[i].options));
       base_descs[i].options.table_factory = titan_table_factory;
       // Add TableProperties for collecting statistics GC
       base_descs[i].options.table_properties_collector_factories.emplace_back(
@@ -294,8 +299,11 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
   }
 
   s = blob_file_set_->Open(column_families);
-  for(auto cf:column_families){
-    builders_.emplace(cf.first, ForegroundBuilder(cf.first, blob_manager_, blob_file_set_->GetBlobStorage(cf.first), db_options_,cf.second));
+  for (auto cf : column_families) {
+    builders_.emplace(
+        cf.first, ForegroundBuilder(cf.first, blob_manager_,
+                                    blob_file_set_->GetBlobStorage(cf.first),
+                                    db_options_, cf.second));
   }
   if (!s.ok()) return s;
 
@@ -1034,20 +1042,23 @@ TitanDBOptions TitanDBImpl::GetTitanDBOptions() const {
 
 bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
                               const Slice& property, std::string* value) {
-  std::cout << "blob builder written bytes: " << bytes_written/1000000.0 << std::endl;
-  std::cout << "gc update lsm time: " << gc_update_lsm/1000000.0 << std::endl;
-  std::cout << "gc read lsm time: " << gc_read_lsm/1000000.0 << std::endl;
-  std::cout << "gc sample time: " << gc_sample/1000000.0 << std::endl;
-  std::cout << "total gc time: " << gc_total/1000000.0 << std::endl;
-  std::cout << "compute gc score time: " << compute_gc_score/1000000.0 << std::endl;
-  std::cout << "blob merge time: " << blob_merge_time/1000000.0 << std::endl;
-  std::cout << "blob read time: " << blob_read_time/1000000.0 << std::endl;
-  std::cout << "blob add time: " << blob_add_time/1000000.0 << std::endl;
-  std::cout << "blob finish time; " << blob_finish_time/1000000.0 << std::endl;
-  std::cout << "foreground blob add time; " << foreground_blob_add_time/1000000.0
+  std::cout << "blob builder written bytes: " << bytes_written / 1000000.0
             << std::endl;
-  std::cout << "foreground blob finish time: " << foreground_blob_finish_time/1000000.0
+  std::cout << "gc update lsm time: " << gc_update_lsm / 1000000.0 << std::endl;
+  std::cout << "gc read lsm time: " << gc_read_lsm / 1000000.0 << std::endl;
+  std::cout << "gc sample time: " << gc_sample / 1000000.0 << std::endl;
+  std::cout << "total gc time: " << gc_total / 1000000.0 << std::endl;
+  std::cout << "compute gc score time: " << compute_gc_score / 1000000.0
             << std::endl;
+  std::cout << "blob merge time: " << blob_merge_time / 1000000.0 << std::endl;
+  std::cout << "blob read time: " << blob_read_time / 1000000.0 << std::endl;
+  std::cout << "blob add time: " << blob_add_time / 1000000.0 << std::endl;
+  std::cout << "blob finish time; " << blob_finish_time / 1000000.0
+            << std::endl;
+  std::cout << "foreground blob add time; "
+            << foreground_blob_add_time / 1000000.0 << std::endl;
+  std::cout << "foreground blob finish time: "
+            << foreground_blob_finish_time / 1000000.0 << std::endl;
   assert(column_family != nullptr);
   bool s = false;
   if (stats_.get() != nullptr) {
@@ -1266,7 +1277,7 @@ void TitanDBImpl::OnCompactionCompleted(
         // new blob files. Delete blob files which have no live data.
         // Mark last two level blob files to merge in next compaction if
         // discardable size reached GC threshold
-        if (file->NoLiveData()&&file->file_type()==kSorted) {
+        if (file->NoLiveData() && file->file_type() == kSorted) {
           edit.DeleteBlobFile(file->file_number(),
                               db_impl_->GetLatestSequenceNumber());
           continue;

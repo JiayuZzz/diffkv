@@ -28,7 +28,8 @@ class BlobFileManager {
   // If successful, sets "*handle* to the new file handle.
   virtual Status NewFile(std::unique_ptr<BlobFileHandle>* handle) = 0;
 
-  virtual Status NewFile(std::unique_ptr<BlobFileHandle>* handle, const EnvOptions& option){
+  virtual Status NewFile(std::unique_ptr<BlobFileHandle>* handle,
+                         const EnvOptions& option) {
     return NewFile(handle);
   }
 

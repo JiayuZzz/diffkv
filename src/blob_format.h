@@ -44,12 +44,12 @@ struct BlobRecord {
   Slice key;
   Slice value;
 
-  void EncodeTo(std::string* dst) const;
-  Status DecodeFrom(Slice* src);
+  void EncodeTo(std::string *dst) const;
+  Status DecodeFrom(Slice *src);
 
   size_t size() const { return key.size() + value.size(); }
 
-  friend bool operator==(const BlobRecord& lhs, const BlobRecord& rhs);
+  friend bool operator==(const BlobRecord &lhs, const BlobRecord &rhs);
 };
 
 class BlobEncoder {
@@ -60,7 +60,7 @@ class BlobEncoder {
                           CompressionDict::GetEmptyDict(), compression,
                           0 /*sample_for_compression*/) {}
 
-  void EncodeRecord(const BlobRecord& record);
+  void EncodeRecord(const BlobRecord &record);
 
   Slice GetHeader() const { return Slice(header_, sizeof(header_)); }
   Slice GetRecord() const { return record_; }
@@ -79,8 +79,8 @@ class BlobEncoder {
 
 class BlobDecoder {
  public:
-  Status DecodeHeader(Slice* src);
-  Status DecodeRecord(Slice* src, BlobRecord* record, OwnedSlice* buffer);
+  Status DecodeHeader(Slice *src);
+  Status DecodeRecord(Slice *src, BlobRecord *record, OwnedSlice *buffer);
 
   size_t GetRecordSize() const { return record_size_; }
 
@@ -103,10 +103,10 @@ struct BlobHandle {
   uint64_t offset{0};
   uint64_t size{0};
 
-  void EncodeTo(std::string* dst) const;
-  Status DecodeFrom(Slice* src);
+  void EncodeTo(std::string *dst) const;
+  Status DecodeFrom(Slice *src);
 
-  friend bool operator==(const BlobHandle& lhs, const BlobHandle& rhs);
+  friend bool operator==(const BlobHandle &lhs, const BlobHandle &rhs);
 };
 
 // Format of blob index (not fixed size):
@@ -126,10 +126,10 @@ struct BlobIndex {
   uint64_t file_number{0};
   BlobHandle blob_handle;
 
-  void EncodeTo(std::string* dst) const;
-  Status DecodeFrom(Slice* src);
+  void EncodeTo(std::string *dst) const;
+  Status DecodeFrom(Slice *src);
 
-  friend bool operator==(const BlobIndex& lhs, const BlobIndex& rhs);
+  friend bool operator==(const BlobIndex &lhs, const BlobIndex &rhs);
 };
 
 // Format of blob file meta (not fixed size):
@@ -186,8 +186,8 @@ class BlobFileMeta {
 
   BlobFileMeta(uint64_t _file_number, uint64_t _file_size,
                uint64_t _file_entries, uint32_t _file_level,
-               const std::string& _smallest_key,
-               const std::string& _largest_key, uint32_t _file_type)
+               const std::string &_smallest_key,
+               const std::string &_largest_key, uint32_t _file_type)
       : file_number_(_file_number),
         file_size_(_file_size),
         file_entries_(_file_entries),
@@ -196,18 +196,18 @@ class BlobFileMeta {
         smallest_key_(_smallest_key),
         largest_key_(_largest_key) {}
 
-  friend bool operator==(const BlobFileMeta& lhs, const BlobFileMeta& rhs);
+  friend bool operator==(const BlobFileMeta &lhs, const BlobFileMeta &rhs);
 
-  void EncodeTo(std::string* dst) const;
-  Status DecodeFrom(Slice* src);
-  Status DecodeFromLegacy(Slice* src);
+  void EncodeTo(std::string *dst) const;
+  Status DecodeFrom(Slice *src);
+  Status DecodeFromLegacy(Slice *src);
 
   uint64_t file_number() const { return file_number_; }
   uint64_t file_size() const { return file_size_; }
   uint64_t file_entries() const { return file_entries_; }
   uint32_t file_level() const { return file_level_; }
-  const std::string& smallest_key() const { return smallest_key_; }
-  const std::string& largest_key() const { return largest_key_; }
+  const std::string &smallest_key() const { return smallest_key_; }
+  const std::string &largest_key() const { return largest_key_; }
 
   FileState file_state() const { return state_; }
   bool is_obsolete() const { return state_ == FileState::kObsolete; }
@@ -217,7 +217,7 @@ class BlobFileMeta {
   bool gc_mark() const { return gc_mark_; }
   void set_gc_mark(bool mark) { gc_mark_ = mark; }
 
-  void FileStateTransit(const FileEvent& event);
+  void FileStateTransit(const FileEvent &event);
 
   void AddDiscardableSize(uint64_t _discardable_size);
   double GetDiscardableRatio() const;
@@ -267,8 +267,8 @@ struct BlobFileHeader {
 
   uint32_t version = kVersion1;
 
-  void EncodeTo(std::string* dst) const;
-  Status DecodeFrom(Slice* src);
+  void EncodeTo(std::string *dst) const;
+  Status DecodeFrom(Slice *src);
 };
 
 // Format of blob file footer (BlockHandle::kMaxEncodedLength + 12):
@@ -288,15 +288,15 @@ struct BlobFileFooter {
 
   BlockHandle meta_index_handle{BlockHandle::NullBlockHandle()};
 
-  void EncodeTo(std::string* dst) const;
-  Status DecodeFrom(Slice* src);
+  void EncodeTo(std::string *dst) const;
+  Status DecodeFrom(Slice *src);
 
-  friend bool operator==(const BlobFileFooter& lhs, const BlobFileFooter& rhs);
+  friend bool operator==(const BlobFileFooter &lhs, const BlobFileFooter &rhs);
 };
 
 // A convenient template to decode a const slice.
 template <typename T>
-Status DecodeInto(const Slice& src, T* target) {
+Status DecodeInto(const Slice &src, T *target) {
   auto tmp = src;
   auto s = target->DecodeFrom(&tmp);
   if (s.ok() && !tmp.empty()) {

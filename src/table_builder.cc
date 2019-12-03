@@ -314,7 +314,7 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
   {
     TitanStopWatch swadd(env_, add_time);
     std::string k = key.ToString();
-    int b = num_builders_>1 ? hash(k)%num_builders_ : 0;
+    int b = num_builders_ > 1 ? hash(k) % num_builders_ : 0;
     mutex_[b].lock();
     if (value.size() < cf_options_.min_blob_size ||
         (cf_options_.level_merge && value.size() < cf_options_.mid_blob_size)) {
@@ -333,8 +333,8 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
       builder_[b] = std::unique_ptr<BlobFileBuilder>(
           new BlobFileBuilder(db_options_, cf_options_, handle_[b]->GetFile()));
       auto storage = blob_storage_.lock();
-      if(!storage){
-        std::cerr<<"no storage!"<<std::endl;
+      if (!storage) {
+        std::cerr << "no storage!" << std::endl;
         abort();
       }
       storage->AddBuildingFile(handle_[b]->GetNumber());
@@ -370,12 +370,12 @@ Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
 }
 
 void ForegroundBuilder::Finish() {
-  for(int i=0;i<num_builders_;i++){
-  mutex_[i].lock();
-  FinishBlob(i);
-  blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_[i]);
-  finished_files_[i].clear();
-  mutex_[i].unlock();
+  for (int i = 0; i < num_builders_; i++) {
+    mutex_[i].lock();
+    FinishBlob(i);
+    blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_[i]);
+    finished_files_[i].clear();
+    mutex_[i].unlock();
   }
 }
 
@@ -391,21 +391,25 @@ Status ForegroundBuilder::FinishBlob(int b) {
           handle_[b]->GetNumber(), handle_[b]->GetFile()->GetFileSize(),
           builder_[b]->NumEntries(), 0, builder_[b]->GetSmallestKey(),
           builder_[b]->GetLargestKey(), kUnSorted);
-      // std::cerr<<"finish file size "<<handle_[b]->GetFile()->GetFileSize()<<" discardable size "<<discardable_[b]<<" file "<<file->file_number()<<std::endl;
+      // std::cerr<<"finish file size "<<handle_[b]->GetFile()->GetFileSize()<<"
+      // discardable size "<<discardable_[b]<<" file
+      // "<<file->file_number()<<std::endl;
       file->AddDiscardableSize(discardable_[b]);
-      if(file->GetDiscardableRatio()>1) {
-        std::cerr<<"ratio "<<file->GetDiscardableRatio()<<std::endl;
+      if (file->GetDiscardableRatio() > 1) {
+        std::cerr << "ratio " << file->GetDiscardableRatio() << std::endl;
         abort();
       }
-      if(file->NoLiveData()){
-        std::cerr<<"delete file "<<file->file_number()<<std::endl;
-        env_->DeleteFile(BlobFileName(db_options_.dirname, file->file_number()));
+      if (file->NoLiveData()) {
+        std::cerr << "delete file " << file->file_number() << std::endl;
+        env_->DeleteFile(
+            BlobFileName(db_options_.dirname, file->file_number()));
       } else {
         file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
-        finished_files_[b].emplace_back(std::make_pair(file, std::move(handle_[b])));
+        finished_files_[b].emplace_back(
+            std::make_pair(file, std::move(handle_[b])));
       }
     } else {
-      std::cerr<<"finish failed"<<std::endl;
+      std::cerr << "finish failed" << std::endl;
       abort();
     }
     builder_[b].reset();

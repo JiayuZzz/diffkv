@@ -71,7 +71,8 @@ class BlobStorage {
   // corruption if the file doesn't exist.
   std::weak_ptr<BlobFileMeta> FindFile(uint64_t file_number) const;
 
-  std::weak_ptr<RandomAccessFileReader> FindBuildingFile(uint64_t file_number) const;
+  std::weak_ptr<RandomAccessFileReader> FindBuildingFile(
+      uint64_t file_number) const;
 
   // Marks all the blob files so that they can be picked by GC job.
   void MarkAllFilesForGC() {
@@ -134,7 +135,7 @@ class BlobStorage {
       std::map<uint64_t, std::weak_ptr<BlobFileMeta>>& ret) const;
 
   Status ReadBuildingFile(const ReadOptions& options, const BlobIndex& index,
-             BlobRecord* record);
+                          BlobRecord* record);
 
  private:
   friend class BlobFileSet;
@@ -157,7 +158,8 @@ class BlobStorage {
   // Only BlobStorage OWNS BlobFileMeta
   std::unordered_map<uint64_t, std::shared_ptr<BlobFileMeta>> files_;
 
-  std::unordered_map<uint64_t, std::shared_ptr<RandomAccessFileReader>> building_files_;
+  std::unordered_map<uint64_t, std::shared_ptr<RandomAccessFileReader>>
+      building_files_;
 
   class InternalComparator {
    public:

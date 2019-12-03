@@ -25,7 +25,8 @@ void BlobFileBuilder::Add(const BlobRecord& record, BlobHandle* handle) {
   handle->offset = file_->GetFileSize();
   handle->size = encoder_.GetEncodedSize();
 
-  status_ = file_->Append(encoder_.GetHeader().ToString()+encoder_.GetRecord().ToString());
+  status_ = file_->Append(encoder_.GetHeader().ToString() +
+                          encoder_.GetRecord().ToString());
   if (ok()) {
     bytes_written += handle->size;
     // status_ = file_->Append(encoder_.GetRecord());

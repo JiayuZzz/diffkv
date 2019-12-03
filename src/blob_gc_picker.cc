@@ -28,7 +28,9 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
   bool maybe_continue_next_time = false;
   uint64_t next_gc_size = 0;
   for (auto& gc_score : blob_storage->gc_score()) {
-    if (gc_score.score < cf_options_.blob_file_discardable_ratio && cf_options_.level_merge && cf_options_.blob_file_discardable_ratio != 0.01) {
+    if (gc_score.score < cf_options_.blob_file_discardable_ratio &&
+        cf_options_.level_merge &&
+        cf_options_.blob_file_discardable_ratio != 0.01) {
       // std::cerr<<"break"<<std::endl;
       break;
     }
@@ -43,11 +45,11 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
       // std::cerr<<"no need gc"<<std::endl;
       // if(!blob_file) std::cerr<<"no such file"<<std::endl;
       // if (!CheckBlobFile(blob_file.get()))
-        // std::cerr << "check failed" << std::endl;
+      // std::cerr << "check failed" << std::endl;
       continue;
     }
     if (!stop_picking) {
-      if(gc_score.score == 0) continue;
+      if (gc_score.score == 0) continue;
       blob_files.push_back(blob_file.get());
       batch_size += blob_file->file_size();
       // std::cerr<<"batch size add "<<blob_file->file_size()<<"

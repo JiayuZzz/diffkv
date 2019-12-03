@@ -1,7 +1,7 @@
 #include "blob_storage.h"
+#include "atomic"
 #include "blob_file_set.h"
 #include "iostream"
-#include "atomic"
 
 std::atomic<uint64_t> compute_gc_score{0};
 
@@ -13,7 +13,7 @@ extern Env* env_;
 Status BlobStorage::Get(const ReadOptions& options, const BlobIndex& index,
                         BlobRecord* record, PinnableSlice* buffer) {
   auto sfile = FindFile(index.file_number).lock();
-  if (!sfile){
+  if (!sfile) {
     if (db_options_.sep_before_flush) {
       return ReadBuildingFile(options, index, record);
     }
@@ -24,34 +24,37 @@ Status BlobStorage::Get(const ReadOptions& options, const BlobIndex& index,
                           index.blob_handle, record, buffer);
 }
 
-Status BlobStorage::ReadBuildingFile(const ReadOptions& options, const BlobIndex& index,
-             BlobRecord* record){
-    auto reader = FindBuildingFile(index.file_number).lock();
-    if(!reader){
-      return Status::Corruption("File " + std::to_string(index.file_number)+" not exist");
-    }
-    Slice blob;
-    OwnedSlice buffer;
-    CacheAllocationPtr ubuf(new char[index.blob_handle.size]);
-    auto s = reader->Read(index.blob_handle.offset, index.blob_handle.size, &blob, ubuf.get());
-    if(!s.ok()) {
-      return s;
-    }
-    if (index.blob_handle.size!=static_cast<uint64_t>(blob.size())) {
-          return Status::Corruption(
-        "ReadRecord actual size: " + ToString(blob.size()) +
-        " not equal to blob size " + ToString(index.blob_handle.size));
-    }
-
-    BlobDecoder decoder;
-    s = decoder.DecodeHeader(&blob);
-    if (!s.ok()) {
-      return s;
-    }
-    buffer.reset(std::move(ubuf), blob);
-    s = decoder.DecodeRecord(&blob, record, &buffer);
+Status BlobStorage::ReadBuildingFile(const ReadOptions& options,
+                                     const BlobIndex& index,
+                                     BlobRecord* record) {
+  auto reader = FindBuildingFile(index.file_number).lock();
+  if (!reader) {
+    return Status::Corruption("File " + std::to_string(index.file_number) +
+                              " not exist");
+  }
+  Slice blob;
+  OwnedSlice buffer;
+  CacheAllocationPtr ubuf(new char[index.blob_handle.size]);
+  auto s = reader->Read(index.blob_handle.offset, index.blob_handle.size, &blob,
+                        ubuf.get());
+  if (!s.ok()) {
     return s;
   }
+  if (index.blob_handle.size != static_cast<uint64_t>(blob.size())) {
+    return Status::Corruption(
+        "ReadRecord actual size: " + ToString(blob.size()) +
+        " not equal to blob size " + ToString(index.blob_handle.size));
+  }
+
+  BlobDecoder decoder;
+  s = decoder.DecodeHeader(&blob);
+  if (!s.ok()) {
+    return s;
+  }
+  buffer.reset(std::move(ubuf), blob);
+  s = decoder.DecodeRecord(&blob, record, &buffer);
+  return s;
+}
 
 Status BlobStorage::NewPrefetcher(uint64_t file_number,
                                   std::unique_ptr<BlobFilePrefetcher>* result) {
@@ -116,7 +119,8 @@ std::weak_ptr<BlobFileMeta> BlobStorage::FindFile(uint64_t file_number) const {
   return std::weak_ptr<BlobFileMeta>();
 }
 
-std::weak_ptr<RandomAccessFileReader> BlobStorage::FindBuildingFile(uint64_t file_number) const {
+std::weak_ptr<RandomAccessFileReader> BlobStorage::FindBuildingFile(
+    uint64_t file_number) const {
   MutexLock l(&mutex_);
   auto it = building_files_.find(file_number);
   if (it != building_files_.end()) {
@@ -140,7 +144,7 @@ void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta>& file) {
   AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_FILE_SIZE,
            file->file_size());
   AddStats(stats_, cf_id_, TitanInternalStats::NUM_LIVE_BLOB_FILE, 1);
-  if(db_options_.sep_before_flush){
+  if (db_options_.sep_before_flush) {
     building_files_.erase(file->file_number());
   }
 }
@@ -149,14 +153,14 @@ Status BlobStorage::AddBuildingFile(uint64_t file_number) {
   std::shared_ptr<RandomAccessFileReader> reader;
   Status s;
   {
-  std::unique_ptr<RandomAccessFile> file;
-  auto file_name = BlobFileName(db_options_.dirname, file_number);
-  s = env_->NewRandomAccessFile(file_name, &file, env_options_);
-  if(!s.ok()) return s;
-  if (db_options_.advise_random_on_open) {
-    file->Hint(RandomAccessFile::RANDOM);
-  }
-  reader.reset(new RandomAccessFileReader(std::move(file), file_name));
+    std::unique_ptr<RandomAccessFile> file;
+    auto file_name = BlobFileName(db_options_.dirname, file_number);
+    s = env_->NewRandomAccessFile(file_name, &file, env_options_);
+    if (!s.ok()) return s;
+    if (db_options_.advise_random_on_open) {
+      file->Hint(RandomAccessFile::RANDOM);
+    }
+    reader.reset(new RandomAccessFileReader(std::move(file), file_name));
   }
   MutexLock l(&mutex_);
   building_files_.emplace(std::make_pair(file_number, reader));
@@ -251,42 +255,42 @@ void BlobStorage::ComputeGCScore() {
   MutexLock l(&mutex_);
   uint64_t start = 0;
   {
-  TitanStopWatch sw(env_, start);
-  gc_score_.clear();
+    TitanStopWatch sw(env_, start);
+    gc_score_.clear();
 
-  for (auto& file : files_) {
-    if (file.second->is_obsolete() ||
-        (cf_options_.level_merge && file.second->file_type() == kSorted)) {
-      continue;
+    for (auto& file : files_) {
+      if (file.second->is_obsolete() ||
+          (cf_options_.level_merge && file.second->file_type() == kSorted)) {
+        continue;
+      }
+      gc_score_.push_back({});
+      auto& gcs = gc_score_.back();
+      gcs.file_number = file.first;
+      if (file.second->file_size() < cf_options_.merge_small_file_threshold ||
+          file.second->gc_mark()) {
+        // for the small file or file with gc mark (usually the file that just
+        // recovered) we want gc these file but more hope to gc other file with
+        // more invalid data
+        gcs.score = cf_options_.blob_file_discardable_ratio;
+      } else {
+        gcs.score = file.second->GetDiscardableRatio();
+      }
+      // if(gcs.score >= cf_options_.blob_file_discardable_ratio)
+      // std::cerr<<"gc score is "<<gcs.score<<std::endl;
     }
-    gc_score_.push_back({});
-    auto& gcs = gc_score_.back();
-    gcs.file_number = file.first;
-    if (file.second->file_size() < cf_options_.merge_small_file_threshold ||
-        file.second->gc_mark()) {
-      // for the small file or file with gc mark (usually the file that just
-      // recovered) we want gc these file but more hope to gc other file with
-      // more invalid data
-      gcs.score = cf_options_.blob_file_discardable_ratio;
-    } else {
-      gcs.score = file.second->GetDiscardableRatio();
-    }
-    // if(gcs.score >= cf_options_.blob_file_discardable_ratio)
-    // std::cerr<<"gc score is "<<gcs.score<<std::endl;
-  }
 
-  if(cf_options_.blob_file_discardable_ratio == 0.01 && !cf_options_.level_merge){
+    if (cf_options_.blob_file_discardable_ratio == 0.01 &&
+        !cf_options_.level_merge) {
       std::sort(gc_score_.begin(), gc_score_.end(),
-            [](const GCScore& first, const GCScore& second) {
-              return first.file_number < second.file_number;
-            });
-  } else {
-
-  std::sort(gc_score_.begin(), gc_score_.end(),
-            [](const GCScore& first, const GCScore& second) {
-              return first.score > second.score;
-            });
-  }
+                [](const GCScore& first, const GCScore& second) {
+                  return first.file_number < second.file_number;
+                });
+    } else {
+      std::sort(gc_score_.begin(), gc_score_.end(),
+                [](const GCScore& first, const GCScore& second) {
+                  return first.score > second.score;
+                });
+    }
   }
   compute_gc_score += start;
 }
