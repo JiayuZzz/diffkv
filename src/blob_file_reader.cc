@@ -34,7 +34,7 @@ Status NewBlobFileReader(uint64_t file_number, uint64_t readahead_size,
   return s;
 }
 
-const uint64_t kMaxReadaheadSize = 256 << 10;
+const uint64_t kMaxReadaheadSize = 64 << 10;
 
 namespace {
 
