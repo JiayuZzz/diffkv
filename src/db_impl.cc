@@ -168,23 +168,6 @@ TitanDBImpl::~TitanDBImpl() {
   for (auto& builder : builders_) builder.second.Finish();
   PurgeObsoleteFiles();
   Close();
-  std::cout << "blob builder written bytes: " << bytes_written / 1000000.0
-            << std::endl;
-  std::cout << "gc update lsm time: " << gc_update_lsm / 1000000.0 << std::endl;
-  std::cout << "gc read lsm time: " << gc_read_lsm / 1000000.0 << std::endl;
-  std::cout << "gc sample time: " << gc_sample / 1000000.0 << std::endl;
-  std::cout << "total gc time: " << gc_total / 1000000.0 << std::endl;
-  std::cout << "compute gc score time: " << compute_gc_score / 1000000.0
-            << std::endl;
-  std::cout << "blob merge time: " << blob_merge_time / 1000000.0 << std::endl;
-  std::cout << "blob read time: " << blob_read_time / 1000000.0 << std::endl;
-  std::cout << "blob add time: " << blob_add_time / 1000000.0 << std::endl;
-  std::cout << "blob finish time; " << blob_finish_time / 1000000.0
-            << std::endl;
-  std::cout << "foreground blob add time; "
-            << foreground_blob_add_time / 1000000.0 << std::endl;
-  std::cout << "foreground blob finish time: "
-            << foreground_blob_finish_time / 1000000.0 << std::endl;
 }
 
 void TitanDBImpl::StartBackgroundTasks() {
@@ -1061,12 +1044,14 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
             << foreground_blob_finish_time / 1000000.0 << std::endl;
   assert(column_family != nullptr);
   bool s = false;
+  /*
   if (stats_.get() != nullptr) {
     auto stats = stats_->internal_stats(column_family->GetID());
     if (stats != nullptr) {
       s = stats->GetStringProperty(property, value);
     }
   }
+  */
   if (s) {
     return s;
   } else {
