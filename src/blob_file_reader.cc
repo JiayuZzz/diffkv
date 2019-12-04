@@ -161,8 +161,10 @@ Status BlobFileReader::ReadRecord(const BlobHandle& handle, BlobRecord* record,
 Status BlobFilePrefetcher::Get(const ReadOptions& options,
                                const BlobHandle& handle, BlobRecord* record,
                                PinnableSlice* buffer) {
-  if(only_value_) record->only_value = true;
-  else record->only_value = false;
+  if (only_value_)
+    record->only_value = true;
+  else
+    record->only_value = false;
   if (handle.offset == last_offset_) {
     last_offset_ = handle.offset + handle.size;
     if (handle.offset + handle.size > readahead_limit_) {

@@ -18,23 +18,23 @@ bool GetChar(Slice* src, unsigned char* value) {
 }  // namespace
 
 void BlobRecord::EncodeTo(std::string* dst) const {
-  if(only_value){
+  if (only_value) {
     dst->append(value.data(), value.size());
   } else {
-  PutLengthPrefixedSlice(dst, key);
-  PutLengthPrefixedSlice(dst, value);
+    PutLengthPrefixedSlice(dst, key);
+    PutLengthPrefixedSlice(dst, value);
   }
 }
 
 Status BlobRecord::DecodeFrom(Slice* src) {
-  if(only_value){
-    value = Slice(src->data(),src->size());
+  if (only_value) {
+    value = Slice(src->data(), src->size());
     src->remove_prefix(src->size());
   } else {
-  if (!GetLengthPrefixedSlice(src, &key) ||
-      !GetLengthPrefixedSlice(src, &value)) {
-    return Status::Corruption("BlobRecord");
-  }
+    if (!GetLengthPrefixedSlice(src, &key) ||
+        !GetLengthPrefixedSlice(src, &value)) {
+      return Status::Corruption("BlobRecord");
+    }
   }
   return Status::OK();
 }

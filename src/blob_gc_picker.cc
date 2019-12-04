@@ -29,10 +29,10 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
   uint64_t next_gc_size = 0;
   for (auto& gc_score : blob_storage->gc_score()) {
     // if (gc_score.score < cf_options_.blob_file_discardable_ratio &&
-        // cf_options_.level_merge &&
-        // cf_options_.blob_file_discardable_ratio != 0.01) {
-      // std::cerr<<"break"<<std::endl;
-      // break;
+    // cf_options_.level_merge &&
+    // cf_options_.blob_file_discardable_ratio != 0.01) {
+    // std::cerr<<"break"<<std::endl;
+    // break;
     // }
     assert(gc_score.score >= cf_options_.blob_file_discardable_ratio);
     auto blob_file = blob_storage->FindFile(gc_score.file_number).lock();

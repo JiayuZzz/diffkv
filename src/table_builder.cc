@@ -20,7 +20,7 @@ std::atomic<uint64_t> foreground_blob_finish_time{0};
 
 namespace rocksdb {
 namespace titandb {
-Env* env_ = Env::Default();
+Env *env_ = Env::Default();
 
 TitanTableBuilder::~TitanTableBuilder() {
   blob_merge_time += blob_merge_time_;
@@ -29,7 +29,7 @@ TitanTableBuilder::~TitanTableBuilder() {
   blob_finish_time += blob_finish_time_;
 }
 
-void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
+void TitanTableBuilder::Add(const Slice &key, const Slice &value) {
   TitanStopWatch swadd(env_, blob_add_time_);
   if (!ok()) return;
 
@@ -151,8 +151,8 @@ void TitanTableBuilder::Add(const Slice& key, const Slice& value) {
   }
 }
 
-void TitanTableBuilder::AddBlob(const Slice& key, const Slice& value,
-                                std::string* index_value) {
+void TitanTableBuilder::AddBlob(const Slice &key, const Slice &value,
+                                std::string *index_value) {
   if (!ok()) return;
   StopWatch write_sw(db_options_.env, stats_, BLOB_DB_BLOB_FILE_WRITE_MICROS);
 
@@ -175,7 +175,7 @@ void TitanTableBuilder::AddBlob(const Slice& key, const Slice& value,
   BlobIndex index;
   index.file_number = blob_handle_->GetNumber();
   BlobRecord record;
-  if(cf_options_.level_merge) record.only_value = true;
+  if (cf_options_.level_merge) record.only_value = true;
   record.key = key;
   record.value = value;
   blob_builder_->Add(record, &index.blob_handle);
@@ -269,7 +269,7 @@ TableProperties TitanTableBuilder::GetTableProperties() const {
 }
 
 bool TitanTableBuilder::ShouldMerge(
-    const std::shared_ptr<rocksdb::titandb::BlobFileMeta>& file) {
+    const std::shared_ptr<rocksdb::titandb::BlobFileMeta> &file) {
   assert(cf_options_.level_merge);
   // Values in blob file should be merged if
   // 1. Corresponding keys are being compacted to last two level from lower
@@ -284,7 +284,7 @@ void TitanTableBuilder::UpdateInternalOpStats() {
   if (stats_ == nullptr) {
     return;
   }
-  TitanInternalStats* internal_stats = stats_->internal_stats(cf_id_);
+  TitanInternalStats *internal_stats = stats_->internal_stats(cf_id_);
   if (internal_stats == nullptr) {
     return;
   }
@@ -292,7 +292,7 @@ void TitanTableBuilder::UpdateInternalOpStats() {
   if (target_level_ == 0) {
     op_type = InternalOpType::FLUSH;
   }
-  InternalOpStats* internal_op_stats =
+  InternalOpStats *internal_op_stats =
       internal_stats->GetInternalOpStatsForType(op_type);
   assert(internal_op_stats != nullptr);
   AddStats(internal_op_stats, InternalOpStatsType::COUNT);
@@ -308,8 +308,8 @@ void TitanTableBuilder::UpdateInternalOpStats() {
   }
 }
 
-Status ForegroundBuilder::Add(const Slice& key, const Slice& value,
-                              WriteBatch& wb) {
+Status ForegroundBuilder::Add(const Slice &key, const Slice &value,
+                              WriteBatch &wb) {
   uint64_t add_time = 0;
   Status s;
   {

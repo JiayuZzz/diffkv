@@ -37,9 +37,9 @@ Status BlobFileCache::Get(const ReadOptions& options, uint64_t file_number,
   return s;
 }
 
-Status BlobFileCache::NewPrefetcher(
-    uint64_t file_number, uint64_t file_size,
-    std::unique_ptr<BlobFilePrefetcher>* result, bool sorted_blob) {
+Status BlobFileCache::NewPrefetcher(uint64_t file_number, uint64_t file_size,
+                                    std::unique_ptr<BlobFilePrefetcher>* result,
+                                    bool sorted_blob) {
   Cache::Handle* cache_handle = nullptr;
   Status s = FindFile(file_number, file_size, &cache_handle);
   if (!s.ok()) return s;

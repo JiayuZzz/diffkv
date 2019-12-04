@@ -56,7 +56,8 @@ class BlobFilePrefetcher : public Cleanable {
  public:
   // Constructs a prefetcher with the blob file reader.
   // "*reader" must be valid when the prefetcher is used.
-  BlobFilePrefetcher(BlobFileReader* reader, bool ov = false) : reader_(reader), only_value_(ov) {}
+  BlobFilePrefetcher(BlobFileReader* reader, bool ov = false)
+      : reader_(reader), only_value_(ov) {}
 
   Status Get(const ReadOptions& options, const BlobHandle& handle,
              BlobRecord* record, PinnableSlice* buffer);

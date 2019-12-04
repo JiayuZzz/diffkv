@@ -20,7 +20,7 @@ Status BlobStorage::Get(const ReadOptions &options, const BlobIndex &index,
     return Status::Corruption("Missing blob file: " +
                               std::to_string(index.file_number));
   }
-  if(cf_options_.level_merge&&sfile->file_type()==kSorted){
+  if (cf_options_.level_merge && sfile->file_type() == kSorted) {
     record->only_value = true;
   } else {
     record->only_value = false;
@@ -67,8 +67,9 @@ Status BlobStorage::NewPrefetcher(uint64_t file_number,
   if (!sfile)
     return Status::Corruption("Missing blob wfile: " +
                               std::to_string(file_number));
-  return file_cache_->NewPrefetcher(sfile->file_number(), sfile->file_size(),
-                                    result, sfile->file_type()==kSorted&&cf_options_.level_merge);
+  return file_cache_->NewPrefetcher(
+      sfile->file_number(), sfile->file_size(), result,
+      sfile->file_type() == kSorted && cf_options_.level_merge);
 }
 
 Status BlobStorage::GetBlobFilesInRanges(const RangePtr *ranges, size_t n,

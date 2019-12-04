@@ -26,7 +26,8 @@ class BlobFileCache {
 
   // Creates a prefetcher for the specified file number.
   Status NewPrefetcher(uint64_t file_number, uint64_t file_size,
-                       std::unique_ptr<BlobFilePrefetcher>* result, bool sorted_blob = false);
+                       std::unique_ptr<BlobFilePrefetcher>* result,
+                       bool sorted_blob = false);
 
   // Evicts the file cache for the specified file number.
   void Evict(uint64_t file_number);
