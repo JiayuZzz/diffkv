@@ -8,10 +8,10 @@ std::atomic<uint64_t> compute_gc_score{0};
 namespace rocksdb {
 namespace titandb {
 
-extern Env* env_;
+extern Env *env_;
 
-Status BlobStorage::Get(const ReadOptions& options, const BlobIndex& index,
-                        BlobRecord* record, PinnableSlice* buffer) {
+Status BlobStorage::Get(const ReadOptions &options, const BlobIndex &index,
+                        BlobRecord *record, PinnableSlice *buffer) {
   auto sfile = FindFile(index.file_number).lock();
   if (!sfile) {
     if (db_options_.sep_before_flush) {
@@ -24,9 +24,9 @@ Status BlobStorage::Get(const ReadOptions& options, const BlobIndex& index,
                           index.blob_handle, record, buffer);
 }
 
-Status BlobStorage::ReadBuildingFile(const ReadOptions& options,
-                                     const BlobIndex& index,
-                                     BlobRecord* record) {
+Status BlobStorage::ReadBuildingFile(const ReadOptions &options,
+                                     const BlobIndex &index,
+                                     BlobRecord *record) {
   auto reader = FindBuildingFile(index.file_number).lock();
   if (!reader) {
     return Status::Corruption("File " + std::to_string(index.file_number) +
@@ -57,7 +57,7 @@ Status BlobStorage::ReadBuildingFile(const ReadOptions& options,
 }
 
 Status BlobStorage::NewPrefetcher(uint64_t file_number,
-                                  std::unique_ptr<BlobFilePrefetcher>* result) {
+                                  std::unique_ptr<BlobFilePrefetcher> *result) {
   auto sfile = FindFile(file_number).lock();
   if (!sfile)
     return Status::Corruption("Missing blob wfile: " +
@@ -66,13 +66,13 @@ Status BlobStorage::NewPrefetcher(uint64_t file_number,
                                     result);
 }
 
-Status BlobStorage::GetBlobFilesInRanges(const RangePtr* ranges, size_t n,
+Status BlobStorage::GetBlobFilesInRanges(const RangePtr *ranges, size_t n,
                                          bool include_end,
-                                         std::vector<uint64_t>* files) {
+                                         std::vector<uint64_t> *files) {
   MutexLock l(&mutex_);
   for (size_t i = 0; i < n; i++) {
-    const Slice* begin = ranges[i].start;
-    const Slice* end = ranges[i].limit;
+    const Slice *begin = ranges[i].start;
+    const Slice *end = ranges[i].limit;
     auto cmp = cf_options_.comparator;
 
     std::string tmp;
@@ -130,14 +130,14 @@ std::weak_ptr<RandomAccessFileReader> BlobStorage::FindBuildingFile(
 }
 
 void BlobStorage::ExportBlobFiles(
-    std::map<uint64_t, std::weak_ptr<BlobFileMeta>>& ret) const {
+    std::map<uint64_t, std::weak_ptr<BlobFileMeta>> &ret) const {
   MutexLock l(&mutex_);
-  for (auto& kv : files_) {
+  for (auto &kv : files_) {
     ret.emplace(kv.first, std::weak_ptr<BlobFileMeta>(kv.second));
   }
 }
 
-void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta>& file) {
+void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta> &file) {
   MutexLock l(&mutex_);
   files_.emplace(std::make_pair(file->file_number(), file));
   blob_ranges_.emplace(std::make_pair(Slice(file->smallest_key()), file));
@@ -218,15 +218,15 @@ bool BlobStorage::RemoveFile(uint64_t file_number) {
   return true;
 }
 
-void BlobStorage::GetObsoleteFiles(std::vector<std::string>* obsolete_files,
+void BlobStorage::GetObsoleteFiles(std::vector<std::string> *obsolete_files,
                                    SequenceNumber oldest_sequence) {
   MutexLock l(&mutex_);
 
   uint32_t file_dropped = 0;
   uint64_t file_dropped_size = 0;
   for (auto it = obsolete_files_.begin(); it != obsolete_files_.end();) {
-    auto& file_number = it->first;
-    auto& obsolete_sequence = it->second;
+    auto &file_number = it->first;
+    auto &obsolete_sequence = it->second;
     // We check whether the oldest snapshot is no less than the last sequence
     // by the time the blob file become obsolete. If so, the blob file is not
     // visible to all existing snapshots.
@@ -258,16 +258,18 @@ void BlobStorage::ComputeGCScore() {
     TitanStopWatch sw(env_, start);
     gc_score_.clear();
 
-    for (auto& file : files_) {
+    for (auto &file : files_) {
       if (file.second->is_obsolete() ||
           (cf_options_.level_merge && file.second->file_type() == kSorted)) {
         continue;
       }
       gc_score_.push_back({});
-      auto& gcs = gc_score_.back();
+      auto &gcs = gc_score_.back();
       gcs.file_number = file.first;
-      if (file.second->file_size() < cf_options_.merge_small_file_threshold/* ||
-          file.second->gc_mark()*/) {
+      if (file.second->file_size() <
+          cf_options_.merge_small_file_threshold /* ||
+file.second->gc_mark()*/
+      ) {
         // for the small file or file with gc mark (usually the file that just
         // recovered) we want gc these file but more hope to gc other file with
         // more invalid data
@@ -282,12 +284,12 @@ void BlobStorage::ComputeGCScore() {
     if (cf_options_.blob_file_discardable_ratio == 0.01 &&
         !cf_options_.level_merge) {
       std::sort(gc_score_.begin(), gc_score_.end(),
-                [](const GCScore& first, const GCScore& second) {
+                [](const GCScore &first, const GCScore &second) {
                   return first.file_number < second.file_number;
                 });
     } else {
       std::sort(gc_score_.begin(), gc_score_.end(),
-                [](const GCScore& first, const GCScore& second) {
+                [](const GCScore &first, const GCScore &second) {
                   return first.score > second.score;
                 });
     }
