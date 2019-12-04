@@ -43,6 +43,7 @@ const uint32_t kUnSorted = 1;
 struct BlobRecord {
   Slice key;
   Slice value;
+  bool only_value{false};
 
   void EncodeTo(std::string *dst) const;
   Status DecodeFrom(Slice *src);

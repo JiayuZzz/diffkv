@@ -173,10 +173,11 @@ void TitanTableBuilder::AddBlob(const Slice& key, const Slice& value,
   bytes_written_ += key.size() + value.size();
 
   BlobIndex index;
+  index.file_number = blob_handle_->GetNumber();
   BlobRecord record;
+  if(cf_options_.level_merge) record.only_value = true;
   record.key = key;
   record.value = value;
-  index.file_number = blob_handle_->GetNumber();
   blob_builder_->Add(record, &index.blob_handle);
   RecordTick(stats_, BLOB_DB_BLOB_FILE_BYTES_WRITTEN, index.blob_handle.size);
   bytes_written_ += record.size();

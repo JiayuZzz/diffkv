@@ -39,13 +39,13 @@ Status BlobFileCache::Get(const ReadOptions& options, uint64_t file_number,
 
 Status BlobFileCache::NewPrefetcher(
     uint64_t file_number, uint64_t file_size,
-    std::unique_ptr<BlobFilePrefetcher>* result) {
+    std::unique_ptr<BlobFilePrefetcher>* result, bool sorted_blob) {
   Cache::Handle* cache_handle = nullptr;
   Status s = FindFile(file_number, file_size, &cache_handle);
   if (!s.ok()) return s;
 
   auto reader = reinterpret_cast<BlobFileReader*>(cache_->Value(cache_handle));
-  auto prefetcher = new BlobFilePrefetcher(reader);
+  auto prefetcher = new BlobFilePrefetcher(reader, sorted_blob);
   prefetcher->RegisterCleanup(&UnrefCacheHandle, cache_.get(), cache_handle);
   result->reset(prefetcher);
   return s;

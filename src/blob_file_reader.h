@@ -56,7 +56,7 @@ class BlobFilePrefetcher : public Cleanable {
  public:
   // Constructs a prefetcher with the blob file reader.
   // "*reader" must be valid when the prefetcher is used.
-  BlobFilePrefetcher(BlobFileReader* reader) : reader_(reader) {}
+  BlobFilePrefetcher(BlobFileReader* reader, bool ov = false) : reader_(reader), only_value_(ov) {}
 
   Status Get(const ReadOptions& options, const BlobHandle& handle,
              BlobRecord* record, PinnableSlice* buffer);
@@ -66,6 +66,7 @@ class BlobFilePrefetcher : public Cleanable {
   uint64_t last_offset_{0};
   uint64_t readahead_size_{0};
   uint64_t readahead_limit_{0};
+  bool only_value_{false};
 };
 
 }  // namespace titandb

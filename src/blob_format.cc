@@ -18,14 +18,23 @@ bool GetChar(Slice* src, unsigned char* value) {
 }  // namespace
 
 void BlobRecord::EncodeTo(std::string* dst) const {
+  if(only_value){
+    dst->append(value.data(), value.size());
+  } else {
   PutLengthPrefixedSlice(dst, key);
   PutLengthPrefixedSlice(dst, value);
+  }
 }
 
 Status BlobRecord::DecodeFrom(Slice* src) {
+  if(only_value){
+    value = Slice(src->data(),src->size());
+    src->remove_prefix(src->size());
+  } else {
   if (!GetLengthPrefixedSlice(src, &key) ||
       !GetLengthPrefixedSlice(src, &value)) {
     return Status::Corruption("BlobRecord");
+  }
   }
   return Status::OK();
 }
@@ -256,10 +265,12 @@ TitanInternalStats::StatsType BlobFileMeta::GetDiscardableRatioLevel() const {
              (ratio - 1.0) < std::numeric_limits<double>::epsilon()) {
     type = TitanInternalStats::NUM_DISCARDABLE_RATIO_LE100;
   } else {
+    /*
     fprintf(stderr,
             "invalid discardable ratio %.2f, file type %d, file number %lu, "
             "file size %lu, discardable size %lu\n",
             ratio, file_type_, file_number_, file_size_, discardable_size_);
+            */
     type = TitanInternalStats::NUM_DISCARDABLE_RATIO_LE100;
   }
   return type;
