@@ -266,8 +266,8 @@ void BlobStorage::ComputeGCScore() {
       gc_score_.push_back({});
       auto& gcs = gc_score_.back();
       gcs.file_number = file.first;
-      if (file.second->file_size() < cf_options_.merge_small_file_threshold ||
-          file.second->gc_mark()) {
+      if (file.second->file_size() < cf_options_.merge_small_file_threshold/* ||
+          file.second->gc_mark()*/) {
         // for the small file or file with gc mark (usually the file that just
         // recovered) we want gc these file but more hope to gc other file with
         // more invalid data

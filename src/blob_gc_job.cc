@@ -188,7 +188,7 @@ Status BlobGCJob::DoSample(const BlobFileMeta* file, bool* selected) {
     metrics_.gc_discardable += 1;
     *selected = true;
   }
-  if (*selected) return Status::OK();
+  return Status::OK();
 
   // TODO: add do sample count metrics
   auto records_size = file->file_size() - BlobFileHeader::kEncodedLength -
