@@ -260,7 +260,9 @@ void BlobStorage::ComputeGCScore() {
 
     for (auto &file : files_) {
       if (file.second->is_obsolete() ||
-          (cf_options_.level_merge && file.second->file_type() == kSorted)) {
+          (cf_options_.level_merge && file.second->file_type() == kSorted) ||
+          file.second->GetDiscardableRatio() <
+              cf_options_.blob_file_discardable_ratio) {
         continue;
       }
       gc_score_.push_back({});
@@ -277,22 +279,20 @@ file.second->gc_mark()*/
       } else {
         gcs.score = file.second->GetDiscardableRatio();
       }
-      // if(gcs.score >= cf_options_.blob_file_discardable_ratio)
-      // std::cerr<<"gc score is "<<gcs.score<<std::endl;
     }
 
-    if (cf_options_.blob_file_discardable_ratio == 0.01 &&
-        !cf_options_.level_merge) {
-      std::sort(gc_score_.begin(), gc_score_.end(),
-                [](const GCScore &first, const GCScore &second) {
-                  return first.file_number < second.file_number;
-                });
-    } else {
-      std::sort(gc_score_.begin(), gc_score_.end(),
-                [](const GCScore &first, const GCScore &second) {
-                  return first.score > second.score;
-                });
-    }
+    // if (cf_options_.blob_file_discardable_ratio == 0.01 &&
+    // !cf_options_.level_merge) {
+    std::sort(gc_score_.begin(), gc_score_.end(),
+              [](const GCScore &first, const GCScore &second) {
+                return first.file_number < second.file_number;
+              });
+    // } else {
+    // std::sort(gc_score_.begin(), gc_score_.end(),
+    // [](const GCScore &first, const GCScore &second) {
+    // return first.score > second.score;
+    // });
+    // }
   }
   compute_gc_score += start;
 }
