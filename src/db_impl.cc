@@ -34,6 +34,7 @@ extern std::atomic<uint64_t> blob_finish_time;
 extern std::atomic<uint64_t> foreground_blob_add_time;
 extern std::atomic<uint64_t> foreground_blob_finish_time;
 extern std::atomic<uint64_t> compute_gc_score;
+std::atomic<uint64_t> range_merge_file{0};
 
 namespace rocksdb {
 namespace titandb {
@@ -921,6 +922,7 @@ void TitanDBImpl::MarkFileIfNeedMerge(
   int cur_add = 0;
   int cur_remove = 0;
   int size = blob_ends.size();
+  int marked = 0;
   std::unordered_map<BlobFileMeta*, int> tmp;
   for (int i = 0; i < size; i++) {
     if (blob_ends[i].second) {
@@ -930,10 +932,12 @@ void TitanDBImpl::MarkFileIfNeedMerge(
       ++cur_remove;
       auto record = tmp.find(blob_ends[i].first);
       if (cur_add - record->second > max_sorted_runs) {
+        marked++;
         record->first->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
       }
     }
   }
+  range_merge_file += marked;
 }
 
 Options TitanDBImpl::GetOptions(ColumnFamilyHandle* column_family) const {
@@ -1042,6 +1046,7 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
             << foreground_blob_add_time / 1000000.0 << std::endl;
   std::cout << "foreground blob finish time: "
             << foreground_blob_finish_time / 1000000.0 << std::endl;
+  std::cout << "range merge marked file: "<< range_merge_file <<std::endl;
   assert(column_family != nullptr);
   bool s = false;
   /*

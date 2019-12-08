@@ -160,8 +160,8 @@ struct TitanCFOptions : public ColumnFamilyOptions {
   // Max sorted runs to trigger range merge. Decrease this value will increase
   // write amplification but get better short range scan performance.
   //
-  // Default: 20
-  int max_sorted_runs{20};
+  // Default: 10
+  int max_sorted_runs{10};
 
   TitanCFOptions() = default;
   explicit TitanCFOptions(const ColumnFamilyOptions& options)

@@ -82,10 +82,10 @@ Status BlobDecoder::DecodeRecord(Slice* src, BlobRecord* record,
 
   Slice input(src->data(), record_size_);
   src->remove_prefix(record_size_);
-  uint32_t crc = crc32c::Extend(header_crc_, input.data(), input.size());
-  if (crc != crc_) {
-    return Status::Corruption("BlobRecord", "checksum mismatch");
-  }
+  // uint32_t crc = crc32c::Extend(header_crc_, input.data(), input.size());
+  // if (crc != crc_) {
+    // return Status::Corruption("BlobRecord", "checksum mismatch");
+  // }
 
   if (compression_ == kNoCompression) {
     return DecodeInto(input, record);
