@@ -1288,9 +1288,10 @@ void TitanDBImpl::OnCompactionCompleted(
     }
     if (!cf_options.level_merge || db_options_.sep_before_flush) {
       bs->ComputeGCScore();
-
-      AddToGCQueue(compaction_job_info.cf_id);
-      MaybeScheduleGC();
+      if(bs->ComputeGCScore()>cf_options.min_gc_batch_size/cf_options.blob_file_target_size){
+        AddToGCQueue(compaction_job_info.cf_id);
+        MaybeScheduleGC();
+      }
     }
   }
 }

@@ -317,8 +317,8 @@ Status ForegroundBuilder::Add(const Slice &key, const Slice &value,
     std::string k = key.ToString();
     int b = num_builders_ > 1 ? hash(k) % num_builders_ : 0;
     mutex_[b].lock();
-    if (value.size() < cf_options_.min_blob_size ||
-        (cf_options_.level_merge && value.size() < cf_options_.mid_blob_size)) {
+    if (value.size() <= cf_options_.min_blob_size ||
+        (cf_options_.level_merge && value.size() <= cf_options_.mid_blob_size)) {
       auto iter = keys_[b].find(k);
       if (iter == keys_[b].end()) {
       } else {
@@ -374,8 +374,10 @@ void ForegroundBuilder::Finish() {
   for (int i = 0; i < num_builders_; i++) {
     mutex_[i].lock();
     FinishBlob(i);
-    blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_[i]);
-    finished_files_[i].clear();
+    if(!finished_files_[i].empty()){
+      blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_[i]);
+      finished_files_[i].clear();
+    }
     mutex_[i].unlock();
   }
 }

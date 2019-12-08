@@ -256,7 +256,7 @@ void BlobStorage::GetObsoleteFiles(std::vector<std::string> *obsolete_files,
   }
 }
 
-void BlobStorage::ComputeGCScore() {
+size_t BlobStorage::ComputeGCScore() {
   // TODO: no need to recompute all everytime
   MutexLock l(&mutex_);
   uint64_t start = 0;
@@ -301,6 +301,7 @@ file.second->gc_mark()*/
     // }
   }
   compute_gc_score += start;
+  return gc_score_.size();
 }
 
 }  // namespace titandb
