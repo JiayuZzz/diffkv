@@ -38,7 +38,7 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
     auto blob_file = blob_storage->FindFile(gc_score.file_number).lock();
     if (!CheckBlobFile(blob_file.get()) ||
         (cf_options_.level_merge && blob_file->file_type() == kSorted)) {
-      RecordTick(stats_, TitanStats::GC_NO_NEED, 1);
+      //RecordTick(stats_, TitanStats::GC_NO_NEED, 1);
       // Skip this file id this file is being GCed
       // or this file had been GCed
       ROCKS_LOG_INFO(db_options_.info_log, "Blob file %" PRIu64 " no need gc",
@@ -65,7 +65,7 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
       next_gc_size += blob_file->file_size();
       if (next_gc_size > cf_options_.min_gc_batch_size) {
         maybe_continue_next_time = true;
-        RecordTick(stats_, TitanStats::GC_REMAIN, 1);
+        //RecordTick(stats_, TitanStats::GC_REMAIN, 1);
         ROCKS_LOG_INFO(db_options_.info_log,
                        "remain more than %" PRIu64
                        " bytes to be gc and trigger after this gc",

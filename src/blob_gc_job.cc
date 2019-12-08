@@ -104,20 +104,20 @@ BlobGCJob::~BlobGCJob() {
     LogFlush(db_options_.info_log.get());
   }
   // flush metrics
-  RecordTick(stats_, BLOB_DB_BYTES_READ, metrics_.bytes_read);
-  RecordTick(stats_, BLOB_DB_BYTES_WRITTEN, metrics_.bytes_written);
-  RecordTick(stats_, BLOB_DB_GC_NUM_KEYS_OVERWRITTEN,
-             metrics_.gc_num_keys_overwritten);
-  RecordTick(stats_, BLOB_DB_GC_BYTES_OVERWRITTEN,
-             metrics_.gc_bytes_overwritten);
-  RecordTick(stats_, BLOB_DB_GC_NUM_KEYS_RELOCATED,
-             metrics_.gc_num_keys_relocated);
-  RecordTick(stats_, BLOB_DB_GC_BYTES_RELOCATED, metrics_.gc_bytes_relocated);
-  RecordTick(stats_, BLOB_DB_GC_NUM_NEW_FILES, metrics_.gc_num_new_files);
-  RecordTick(stats_, BLOB_DB_GC_NUM_FILES, metrics_.gc_num_files);
-  RecordTick(stats_, TitanStats::GC_DISCARDABLE, metrics_.gc_discardable);
-  RecordTick(stats_, TitanStats::GC_SMALL_FILE, metrics_.gc_small_file);
-  RecordTick(stats_, TitanStats::GC_SAMPLE, metrics_.gc_sample);
+  //RecordTick(stats_, BLOB_DB_BYTES_READ, metrics_.bytes_read);
+  //RecordTick(stats_, BLOB_DB_BYTES_WRITTEN, metrics_.bytes_written);
+  //RecordTick(stats_, BLOB_DB_GC_NUM_KEYS_OVERWRITTEN,
+            //  metrics_.gc_num_keys_overwritten);
+  //RecordTick(stats_, BLOB_DB_GC_BYTES_OVERWRITTEN,
+            //  metrics_.gc_bytes_overwritten);
+  //RecordTick(stats_, BLOB_DB_GC_NUM_KEYS_RELOCATED,
+            //  metrics_.gc_num_keys_relocated);
+  //RecordTick(stats_, BLOB_DB_GC_BYTES_RELOCATED, metrics_.gc_bytes_relocated);
+  //RecordTick(stats_, BLOB_DB_GC_NUM_NEW_FILES, metrics_.gc_num_new_files);
+  //RecordTick(stats_, BLOB_DB_GC_NUM_FILES, metrics_.gc_num_files);
+  //RecordTick(stats_, TitanStats::GC_DISCARDABLE, metrics_.gc_discardable);
+  //RecordTick(stats_, TitanStats::GC_SMALL_FILE, metrics_.gc_small_file);
+  //RecordTick(stats_, TitanStats::GC_SAMPLE, metrics_.gc_sample);
 }
 
 Status BlobGCJob::Prepare() {

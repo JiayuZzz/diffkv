@@ -78,7 +78,7 @@ class TitanDBImpl::FileManager : public BlobFileManager {
     VersionEdit edit;
     edit.SetColumnFamilyID(cf_id);
     for (auto& file : files) {
-      RecordTick(db_->stats_.get(), BLOB_DB_BLOB_FILE_SYNCED);
+      //RecordTick(db_->stats_.get(), BLOB_DB_BLOB_FILE_SYNCED);
       {
         StopWatch sync_sw(db_->env_, db_->stats_.get(),
                           BLOB_DB_BLOB_FILE_SYNC_MICROS);
@@ -588,7 +588,7 @@ Status TitanDBImpl::GetImpl(const ReadOptions& options,
   if (!s.ok() || !is_blob_index) return s;
 
   StopWatch get_sw(env_, stats_.get(), BLOB_DB_GET_MICROS);
-  RecordTick(stats_.get(), BLOB_DB_NUM_GET);
+  //RecordTick(stats_.get(), BLOB_DB_NUM_GET);
 
   BlobIndex index;
   s = index.DecodeFrom(value);
@@ -605,9 +605,9 @@ Status TitanDBImpl::GetImpl(const ReadOptions& options,
   if (storage) {
     StopWatch read_sw(env_, stats_.get(), BLOB_DB_BLOB_FILE_READ_MICROS);
     s = storage->Get(options, index, &record, &buffer);
-    RecordTick(stats_.get(), BLOB_DB_NUM_KEYS_READ);
-    RecordTick(stats_.get(), BLOB_DB_BLOB_FILE_BYTES_READ,
-               index.blob_handle.size);
+    //RecordTick(stats_.get(), BLOB_DB_NUM_KEYS_READ);
+    //RecordTick(stats_.get(), BLOB_DB_BLOB_FILE_BYTES_READ,
+              //  index.blob_handle.size);
   } else {
     ROCKS_LOG_ERROR(db_options_.info_log,
                     "Column family id:%" PRIu32 " not Found.", handle->GetID());
@@ -1234,7 +1234,7 @@ void TitanDBImpl::OnCompactionCompleted(
     VersionEdit edit;
     auto cf_options = bs->cf_options();
     std::vector<std::shared_ptr<BlobFileMeta>> files;
-    bool count_sorted_run = false;
+    bool count_sorted_run = cf_options.level_merge && cf_options.range_merge && cf_options.num_levels-1==compaction_job_info.output_level;
     for (const auto& bfs : blob_files_size_diff) {
       // blob file size < 0 means discardable size > 0
       if (bfs.second >= 0) {

@@ -132,7 +132,7 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
       if (blob_gc->trigger_next() &&
           (bg_gc_scheduled_ - 1 + gc_queue_.size() <
            2 * static_cast<uint32_t>(db_options_.max_background_gc))) {
-        RecordTick(stats_.get(), TitanStats::GC_TRIGGER_NEXT, 1);
+        //RecordTick(stats_.get(), TitanStats::GC_TRIGGER_NEXT, 1);
         // There is still data remained to be GCed
         // and the queue is not overwhelmed
         // then put this cf to GC queue for next GC
@@ -141,11 +141,11 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
     }
 
     if (s.ok()) {
-      RecordTick(stats_.get(), TitanStats::GC_SUCCESS, 1);
+      //RecordTick(stats_.get(), TitanStats::GC_SUCCESS, 1);
       // Done
     } else {
       SetBGError(s);
-      RecordTick(stats_.get(), TitanStats::GC_FAIL, 1);
+      //RecordTick(stats_.get(), TitanStats::GC_FAIL, 1);
       ROCKS_LOG_WARN(db_options_.info_log, "Titan GC error: %s",
                      s.ToString().c_str());
     }

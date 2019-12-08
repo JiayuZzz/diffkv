@@ -166,7 +166,7 @@ void TitanTableBuilder::AddBlob(const Slice &key, const Slice &value,
         new BlobFileBuilder(db_options_, cf_options_, blob_handle_->GetFile()));
   }
 
-  RecordTick(stats_, BLOB_DB_NUM_KEYS_WRITTEN);
+  //RecordTick(stats_, BLOB_DB_NUM_KEYS_WRITTEN);
   RecordInHistogram(stats_, BLOB_DB_KEY_SIZE, key.size());
   RecordInHistogram(stats_, BLOB_DB_VALUE_SIZE, value.size());
   AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_SIZE, value.size());
@@ -179,7 +179,7 @@ void TitanTableBuilder::AddBlob(const Slice &key, const Slice &value,
   record.key = key;
   record.value = value;
   blob_builder_->Add(record, &index.blob_handle);
-  RecordTick(stats_, BLOB_DB_BLOB_FILE_BYTES_WRITTEN, index.blob_handle.size);
+  //RecordTick(stats_, BLOB_DB_BLOB_FILE_BYTES_WRITTEN, index.blob_handle.size);
   bytes_written_ += record.size();
   if (ok()) {
     index.EncodeTo(index_value);
