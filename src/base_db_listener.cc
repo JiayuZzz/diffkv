@@ -12,6 +12,10 @@ void BaseDbListener::OnFlushCompleted(DB* /*db*/,
   db_impl_->OnFlushCompleted(flush_job_info);
 }
 
+void BaseDbListener::OnMemTableSealed(const MemTableInfo& /*info*/) {
+  db_impl_->OnMemTableSealed();
+}
+
 void BaseDbListener::OnCompactionCompleted(
     DB* /* db */, const CompactionJobInfo& compaction_job_info) {
   db_impl_->OnCompactionCompleted(compaction_job_info);

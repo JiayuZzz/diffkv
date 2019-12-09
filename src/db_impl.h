@@ -129,6 +129,8 @@ class TitanDBImpl : public TitanDB {
   bool GetIntProperty(ColumnFamilyHandle* column_family, const Slice& property,
                       uint64_t* value) override;
 
+  void OnMemTableSealed();
+
   void OnFlushCompleted(const FlushJobInfo& flush_job_info);
 
   void OnCompactionCompleted(const CompactionJobInfo& compaction_job_info);

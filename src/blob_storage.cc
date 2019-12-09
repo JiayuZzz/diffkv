@@ -289,16 +289,18 @@ file.second->gc_mark()*/
 
     // if (cf_options_.blob_file_discardable_ratio == 0.01 &&
     // !cf_options_.level_merge) {
-    std::sort(gc_score_.begin(), gc_score_.end(),
-              [](const GCScore &first, const GCScore &second) {
-                return first.file_number < second.file_number;
-              });
-    // } else {
-    // std::sort(gc_score_.begin(), gc_score_.end(),
-    // [](const GCScore &first, const GCScore &second) {
-    // return first.score > second.score;
-    // });
-    // }
+    if (cf_options_.blob_file_discardable_ratio == 0.01 &&
+        !cf_options_.level_merge) {
+      std::sort(gc_score_.begin(), gc_score_.end(),
+                [](const GCScore &first, const GCScore &second) {
+                  return first.file_number < second.file_number;
+                });
+    } else {
+      std::sort(gc_score_.begin(), gc_score_.end(),
+                [](const GCScore &first, const GCScore &second) {
+                  return first.score > second.score;
+                });
+    }
   }
   compute_gc_score += start;
   return gc_score_.size();

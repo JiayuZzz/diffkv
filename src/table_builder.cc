@@ -166,7 +166,7 @@ void TitanTableBuilder::AddBlob(const Slice &key, const Slice &value,
         new BlobFileBuilder(db_options_, cf_options_, blob_handle_->GetFile()));
   }
 
-  //RecordTick(stats_, BLOB_DB_NUM_KEYS_WRITTEN);
+  // RecordTick(stats_, BLOB_DB_NUM_KEYS_WRITTEN);
   RecordInHistogram(stats_, BLOB_DB_KEY_SIZE, key.size());
   RecordInHistogram(stats_, BLOB_DB_VALUE_SIZE, value.size());
   AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_SIZE, value.size());
@@ -179,7 +179,8 @@ void TitanTableBuilder::AddBlob(const Slice &key, const Slice &value,
   record.key = key;
   record.value = value;
   blob_builder_->Add(record, &index.blob_handle);
-  //RecordTick(stats_, BLOB_DB_BLOB_FILE_BYTES_WRITTEN, index.blob_handle.size);
+  // RecordTick(stats_, BLOB_DB_BLOB_FILE_BYTES_WRITTEN,
+  // index.blob_handle.size);
   bytes_written_ += record.size();
   if (ok()) {
     index.EncodeTo(index_value);
@@ -317,17 +318,6 @@ Status ForegroundBuilder::Add(const Slice &key, const Slice &value,
     std::string k = key.ToString();
     int b = num_builders_ > 1 ? hash(k) % num_builders_ : 0;
     mutex_[b].lock();
-    if (value.size() <= cf_options_.min_blob_size ||
-        (cf_options_.level_merge && value.size() <= cf_options_.mid_blob_size)) {
-      auto iter = keys_[b].find(k);
-      if (iter == keys_[b].end()) {
-      } else {
-        discardable_[b] += iter->second;
-        keys_[b].erase(iter);
-      }
-      mutex_[b].unlock();
-      return Status::InvalidArgument();
-    }
     if (!handle_[b] && !builder_[b]) {
       s = blob_file_manager_->NewFile(&handle_[b], env_options_);
       if (!s.ok()) return s;
@@ -339,8 +329,6 @@ Status ForegroundBuilder::Add(const Slice &key, const Slice &value,
         abort();
       }
       storage->AddBuildingFile(handle_[b]->GetNumber());
-      keys_[b].clear();
-      discardable_[b] = 0;
     }
     BlobRecord blob_record;
     blob_record.key = key;
@@ -348,13 +336,6 @@ Status ForegroundBuilder::Add(const Slice &key, const Slice &value,
     BlobIndex blob_index;
     blob_index.file_number = handle_[b]->GetNumber();
     builder_[b]->Add(blob_record, &blob_index.blob_handle);
-    auto iter = keys_[b].find(k);
-    if (iter == keys_[b].end()) {
-      keys_[b][k] = blob_index.blob_handle.size;
-    } else {
-      discardable_[b] += iter->second;
-      iter->second = blob_index.blob_handle.size;
-    }
     if (handle_[b]->GetFile()->GetFileSize() >=
         cf_options_.blob_file_target_size) {
       FinishBlob(b);
@@ -374,7 +355,7 @@ void ForegroundBuilder::Finish() {
   for (int i = 0; i < num_builders_; i++) {
     mutex_[i].lock();
     FinishBlob(i);
-    if(!finished_files_[i].empty()){
+    if (!finished_files_[i].empty()) {
       blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_[i]);
       finished_files_[i].clear();
     }
@@ -394,31 +375,15 @@ Status ForegroundBuilder::FinishBlob(int b) {
           handle_[b]->GetNumber(), handle_[b]->GetFile()->GetFileSize(),
           builder_[b]->NumEntries(), 0, builder_[b]->GetSmallestKey(),
           builder_[b]->GetLargestKey(), kUnSorted);
-      // std::cerr<<"finish file size "<<handle_[b]->GetFile()->GetFileSize()<<"
-      // discardable size "<<discardable_[b]<<" file
-      // "<<file->file_number()<<std::endl;
-      file->AddDiscardableSize(discardable_[b]);
-      if (file->GetDiscardableRatio() > 1) {
-        std::cerr << "ratio " << file->GetDiscardableRatio() << std::endl;
-        abort();
-      }
-      if (file->NoLiveData()) {
-        std::cerr << "delete file " << file->file_number() << std::endl;
-        env_->DeleteFile(
-            BlobFileName(db_options_.dirname, file->file_number()));
-      } else {
-        file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
-        finished_files_[b].emplace_back(
-            std::make_pair(file, std::move(handle_[b])));
-      }
+      file->FileStateTransit(BlobFileMeta::FileEvent::kReset);
+      finished_files_[b].emplace_back(
+          std::make_pair(file, std::move(handle_[b])));
     } else {
       std::cerr << "finish failed" << std::endl;
       abort();
     }
     builder_[b].reset();
     handle_[b].reset();
-    keys_[b].clear();
-    discardable_[b] = 0;
   }
   foreground_blob_finish_time += finish_time;
   return s;

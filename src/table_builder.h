@@ -121,8 +121,6 @@ class ForegroundBuilder {
         builder_(db_options.num_foreground_builders),
         pool(db_options.num_foreground_builders),
         mutex_(db_options.num_foreground_builders),
-        keys_(db_options.num_foreground_builders),
-        discardable_(db_options.num_foreground_builders),
         finished_files_(db_options.num_foreground_builders) {
     ResetBuilder();
     env_options_.writable_file_max_buffer_size = 4096;
@@ -142,8 +140,6 @@ class ForegroundBuilder {
   std::vector<std::unique_ptr<BlobFileBuilder>> builder_;
   std::vector<std::vector<std::thread>> pool;
   std::vector<std::mutex> mutex_;
-  std::vector<std::unordered_map<std::string, uint64_t>> keys_;
-  std::vector<uint64_t> discardable_;
   std::vector<std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
                                     std::unique_ptr<BlobFileHandle>>>>
       finished_files_;
@@ -154,8 +150,6 @@ class ForegroundBuilder {
       mutex_[i].lock();
       handle_[i].reset();
       builder_[i].reset();
-      keys_[i].clear();
-      discardable_[i] = 0;
       for (auto &t : pool[i]) t.join();
       pool[i].clear();
       finished_files_.clear();
