@@ -3,12 +3,13 @@
 #include "blob_file_builder.h"
 #include "blob_file_manager.h"
 #include "blob_file_set.h"
+#include "future"
 #include "iostream"
-#include "mutex"
 #include "table/table_builder.h"
 #include "titan/options.h"
 #include "titan_stats.h"
 #include "unordered_map"
+#include "util.h"
 #include "vector"
 
 namespace rocksdb {
@@ -101,9 +102,31 @@ class TitanTableBuilder : public TableBuilder {
 
 class ForegroundBuilder {
  public:
-  Status Add(const Slice &key, const Slice &value, WriteBatch &wb);
+  struct Request {
+    Slice key;
+    Slice val;
+    WriteBatch *wb;
+    std::promise<Status> res;
+
+    Request() = default;
+    Request(const Slice &k, const Slice &v, WriteBatch *w)
+        : key(k), val(v), wb(w), res() {}
+  };
+
+  Status Add(const Slice &key, const Slice &value, WriteBatch *wb);
 
   void Finish();
+
+  void Flush();
+
+  void Init() {
+    for (int i = 0; i < num_builders_; i++) {
+      handle_[i].reset();
+      builder_[i].reset();
+      finished_files_.clear();
+      pool_.emplace_back(&ForegroundBuilder::handleRequest, this, i);
+    }
+  }
 
   ForegroundBuilder(uint32_t cf_id,
                     std::shared_ptr<BlobFileManager> blob_file_manager,
@@ -119,10 +142,8 @@ class ForegroundBuilder {
         env_options_(db_options_),
         handle_(db_options.num_foreground_builders),
         builder_(db_options.num_foreground_builders),
-        pool(db_options.num_foreground_builders),
-        mutex_(db_options.num_foreground_builders),
-        finished_files_(db_options.num_foreground_builders) {
-    ResetBuilder();
+        finished_files_(db_options.num_foreground_builders),
+        requests_(db_options.num_foreground_builders) {
     env_options_.writable_file_max_buffer_size = 4096;
   }
 
@@ -138,24 +159,14 @@ class ForegroundBuilder {
   EnvOptions env_options_;
   std::vector<std::unique_ptr<BlobFileHandle>> handle_;
   std::vector<std::unique_ptr<BlobFileBuilder>> builder_;
-  std::vector<std::vector<std::thread>> pool;
-  std::vector<std::mutex> mutex_;
   std::vector<std::vector<std::pair<std::shared_ptr<BlobFileMeta>,
                                     std::unique_ptr<BlobFileHandle>>>>
       finished_files_;
   std::hash<std::string> hash{};
+  std::vector<BlockQueue<Request*>> requests_;
+  std::vector<std::thread> pool_{};
 
-  void ResetBuilder() {
-    for (int i = 0; i < num_builders_; i++) {
-      mutex_[i].lock();
-      handle_[i].reset();
-      builder_[i].reset();
-      for (auto &t : pool[i]) t.join();
-      pool[i].clear();
-      finished_files_.clear();
-      mutex_[i].unlock();
-    }
-  }
+  void handleRequest(int i);
 
   Status FinishBlob(int b);
 };

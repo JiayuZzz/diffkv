@@ -5,10 +5,47 @@
 #include "util/compression.h"
 #include "util/file_reader_writer.h"
 
+#include <list>
 #include "titan_stats.h"
 
 namespace rocksdb {
 namespace titandb {
+
+template <class T>
+class BlockQueue {
+ public:
+  BlockQueue() : mutex_(), cv_(&mutex_), q_() {}
+
+  T Get() {
+    MutexLock ml(&mutex_);
+    while (q_.empty()) cv_.Wait();
+    T ret = q_.front();
+    q_.pop_front();
+    return ret;
+  }
+
+  void Put(const T& item) {
+    MutexLock ml(&mutex_);
+    q_.push_back(item);
+    cv_.Signal();
+  }
+
+  std::vector<T> GetBulk(size_t max = 10){
+    std::vector<T> res;
+    MutexLock ml(&mutex_);
+    while(q_.empty()) cv_.Wait();
+    for(size_t i=0;i<max&&!q_.empty();i++){
+      res.emplace_back(q_.front());
+      q_.pop_front();
+    }
+    return std::move(res);
+  }
+
+ private:
+  port::Mutex mutex_;
+  port::CondVar cv_;
+  std::list<T> q_;
+};
 
 // A slice pointed to an owned buffer.
 class OwnedSlice : public Slice {

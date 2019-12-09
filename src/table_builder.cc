@@ -6,6 +6,7 @@
 
 #include <inttypes.h>
 #include <atomic>
+#include <future>
 #include <iostream>
 #include "monitoring/statistics.h"
 
@@ -310,57 +311,92 @@ void TitanTableBuilder::UpdateInternalOpStats() {
 }
 
 Status ForegroundBuilder::Add(const Slice &key, const Slice &value,
-                              WriteBatch &wb) {
-  uint64_t add_time = 0;
-  Status s;
-  {
-    TitanStopWatch swadd(env_, add_time);
-    std::string k = key.ToString();
-    int b = num_builders_ > 1 ? hash(k) % num_builders_ : 0;
-    mutex_[b].lock();
-    if (!handle_[b] && !builder_[b]) {
-      s = blob_file_manager_->NewFile(&handle_[b], env_options_);
-      if (!s.ok()) return s;
-      builder_[b] = std::unique_ptr<BlobFileBuilder>(
-          new BlobFileBuilder(db_options_, cf_options_, handle_[b]->GetFile()));
-      auto storage = blob_storage_.lock();
-      if (!storage) {
-        std::cerr << "no storage!" << std::endl;
-        abort();
-      }
-      storage->AddBuildingFile(handle_[b]->GetNumber());
-    }
-    BlobRecord blob_record;
-    blob_record.key = key;
-    blob_record.value = value;
-    BlobIndex blob_index;
-    blob_index.file_number = handle_[b]->GetNumber();
-    builder_[b]->Add(blob_record, &blob_index.blob_handle);
-    if (handle_[b]->GetFile()->GetFileSize() >=
-        cf_options_.blob_file_target_size) {
-      FinishBlob(b);
-    }
-    mutex_[b].unlock();
-    std::string index_entry;
-    blob_index.EncodeTo(&index_entry);
+                              WriteBatch *wb) {
+  int b = num_builders_ > 1 ? hash(key.ToString()) % num_builders_ : 0;
+  auto req = Request(key, value, wb);
+  auto fut = req.res.get_future();
+  // std::cerr<<"put"<<std::endl;
+  requests_[b].Put(&req);
+  // std::cerr<<"put done"<<std::endl;
+  return fut.get();
+}
 
-    s = WriteBatchInternal::PutBlobIndex(&wb, cf_id_, blob_record.key,
-                                         index_entry);
+void ForegroundBuilder::handleRequest(int b) {
+  // std::cerr<<"req"<<std::endl;
+  while (true) {
+    // std::cerr<<"get"<<std::endl;
+    auto reqs = requests_[b].GetBulk();
+    // std::cerr<<"got"<<std::endl;
+    for(Request* req:reqs){
+    if(req==nullptr) return;
+    // std::cerr<<"got request"<<std::endl;
+    // finish added blob
+    if (req->key.empty()) {
+      FinishBlob(b);
+      if (!finished_files_[b].empty()) {
+        blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_[b]);
+        finished_files_[b].clear();
+      }
+      req->res.set_value(Status::OK());
+      continue;
+    }
+
+    uint64_t add_time = 0;
+    Status s;
+    {
+      TitanStopWatch swadd(env_, add_time);
+      std::string k = req->key.ToString();
+      if (!handle_[b] && !builder_[b]) {
+        // std::cerr<<"new builder"<<std::endl;
+        s = blob_file_manager_->NewFile(&handle_[b], env_options_);
+        if (!s.ok()) {
+          req->res.set_value(s);
+          continue;
+        }
+        builder_[b] = std::unique_ptr<BlobFileBuilder>(new BlobFileBuilder(
+            db_options_, cf_options_, handle_[b]->GetFile()));
+        auto storage = blob_storage_.lock();
+        if (!storage) {
+          std::cerr << "no storage!" << std::endl;
+          abort();
+        }
+        storage->AddBuildingFile(handle_[b]->GetNumber());
+      }
+      BlobRecord blob_record;
+      blob_record.key = req->key;
+      blob_record.value = req->val;
+      BlobIndex blob_index;
+      blob_index.file_number = handle_[b]->GetNumber();
+      builder_[b]->Add(blob_record, &blob_index.blob_handle);
+      if (handle_[b]->GetFile()->GetFileSize() >=
+          cf_options_.blob_file_target_size) {
+        FinishBlob(b);
+      }
+      std::string index_entry;
+      blob_index.EncodeTo(&index_entry);
+
+      s = WriteBatchInternal::PutBlobIndex(req->wb, cf_id_, blob_record.key,
+                                           index_entry);
+    }
+    foreground_blob_add_time += add_time;
+    req->res.set_value(s);
+    }
   }
-  foreground_blob_add_time += add_time;
-  return s;
+}
+
+void ForegroundBuilder::Flush() {
+  for (int i = 0; i < num_builders_; i++) {
+    auto req = Request("","",nullptr);
+    requests_[i].Put(&req);
+    req.res.get_future().wait();
+  }
 }
 
 void ForegroundBuilder::Finish() {
   for (int i = 0; i < num_builders_; i++) {
-    mutex_[i].lock();
-    FinishBlob(i);
-    if (!finished_files_[i].empty()) {
-      blob_file_manager_->BatchFinishFiles(cf_id_, finished_files_[i]);
-      finished_files_[i].clear();
-    }
-    mutex_[i].unlock();
+    requests_[i].Put(nullptr);
   }
+  for (auto& t:pool_) t.join();
 }
 
 Status ForegroundBuilder::FinishBlob(int b) {

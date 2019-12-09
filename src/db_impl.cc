@@ -166,7 +166,10 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
 
 TitanDBImpl::~TitanDBImpl() {
   DumpStats();
-  for (auto& builder : builders_) builder.second.Finish();
+  for (auto& builder : builders_) {
+    builder.second.Flush();
+    builder.second.Finish();
+  }
   PurgeObsoleteFiles();
   Close();
 }
@@ -283,11 +286,14 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
   }
 
   s = blob_file_set_->Open(column_families);
+  if(db_options_.sep_before_flush){
   for (auto cf : column_families) {
     builders_.emplace(
         cf.first, ForegroundBuilder(cf.first, blob_manager_,
                                     blob_file_set_->GetBlobStorage(cf.first),
                                     db_options_, cf.second));
+    builders_[cf.first].Init();
+  }
   }
   if (!s.ok()) return s;
 
@@ -525,7 +531,7 @@ Status TitanDBImpl::Put(const rocksdb::WriteOptions& options,
   // cf_info_[column_family->GetID()].immutable_cf_options.mid_blob_size) {
   if (db_options_.sep_before_flush) {
     auto wb = WriteBatch();
-    if (builders_[column_family->GetID()].Add(key, value, wb).ok()) {
+    if (builders_[column_family->GetID()].Add(key, value, &wb).ok()) {
       return db_->Write(options, &wb);
     }
     return db_->Put(options, column_family, key, value);
@@ -1084,7 +1090,7 @@ bool TitanDBImpl::GetIntProperty(ColumnFamilyHandle* column_family,
 void TitanDBImpl::OnMemTableSealed() {
   if (db_options_.sep_before_flush) {
     for (auto& builder : builders_) {
-      builder.second.Finish();
+      builder.second.Flush();
     }
   }
 }

@@ -61,7 +61,7 @@ void TitanDBImpl::BackgroundCallGC() {
     MaybeScheduleGC();
     if (bg_gc_scheduled_ == 0 || bg_gc_running_ == 0) {
       // Signal DB destructor if bg_gc_scheduled_ drop to 0.
-      // Signal drop CF requests if bg_gc_running_ drop to 0.
+      // Signal drop CF requests_ if bg_gc_running_ drop to 0.
       // If none of this is true, there is no need to signal since nobody is
       // waiting for it.
       bg_cv_.SignalAll();
