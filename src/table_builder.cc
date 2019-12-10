@@ -415,7 +415,7 @@ Status ForegroundBuilder::FinishBlob(int b) {
       finished_files_[b].emplace_back(
           std::make_pair(file, std::move(handle_[b])));
     } else {
-      std::cerr << "finish failed" << std::endl;
+      std::cerr << "finish failed: " <<s.ToString()<< std::endl;
       abort();
     }
     builder_[b].reset();

@@ -123,7 +123,7 @@ class ForegroundBuilder {
     for (int i = 0; i < num_builders_; i++) {
       handle_[i].reset();
       builder_[i].reset();
-      finished_files_.clear();
+      finished_files_[i].clear();
       pool_.emplace_back(&ForegroundBuilder::handleRequest, this, i);
     }
   }
