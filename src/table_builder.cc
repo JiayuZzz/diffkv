@@ -345,7 +345,6 @@ void ForegroundBuilder::handleRequest(int b) {
     Status s;
     {
       TitanStopWatch swadd(env_, add_time);
-      std::string k = req->key.ToString();
       if (!handle_[b] && !builder_[b]) {
         // std::cerr<<"new builder"<<std::endl;
         s = blob_file_manager_->NewFile(&handle_[b], env_options_);
