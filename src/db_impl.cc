@@ -34,6 +34,7 @@ extern std::atomic<uint64_t> blob_finish_time;
 extern std::atomic<uint64_t> foreground_blob_add_time;
 extern std::atomic<uint64_t> foreground_blob_finish_time;
 extern std::atomic<uint64_t> compute_gc_score;
+extern std::atomic<uint64_t> gc_write_blob;
 std::atomic<uint64_t> range_merge_file{0};
 
 namespace rocksdb {
@@ -1040,6 +1041,7 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
   std::cout << "gc update lsm time: " << gc_update_lsm / 1000000.0 << std::endl;
   std::cout << "gc read lsm time: " << gc_read_lsm / 1000000.0 << std::endl;
   std::cout << "gc sample time: " << gc_sample / 1000000.0 << std::endl;
+  std::cout << "gc write blob time: " << gc_write_blob / 1000000.0 << std::endl;
   std::cout << "total gc time: " << gc_total / 1000000.0 << std::endl;
   std::cout << "compute gc score time: " << compute_gc_score / 1000000.0
             << std::endl;
@@ -1143,6 +1145,7 @@ void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
       } else {
         file->AddDiscardableSize(-f.second);
       }
+      if(file->file_type() == kSorted) assert(file->discardable_size()==0);
       file->FileStateTransit(BlobFileMeta::FileEvent::kFlushCompleted);
     }
   }

@@ -142,7 +142,7 @@ void TitanTableBuilder::Add(const Slice &key, const Slice &value) {
           base_builder_->Add(index_key, index_value);
           return;
         } else {
-          std::cerr << "add blob not ok!" << std::endl;
+          std::cerr << "add blob not ok: " <<s.ToString() << std::endl;
         }
       }
     }

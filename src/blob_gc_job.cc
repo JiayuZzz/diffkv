@@ -13,6 +13,7 @@ std::atomic<uint64_t> gc_update_lsm{0};
 std::atomic<uint64_t> gc_read_lsm{0};
 std::atomic<uint64_t> gc_write_value{0};
 std::atomic<uint64_t> gc_sample{0};
+std::atomic<uint64_t> gc_write_blob{0};
 
 namespace rocksdb {
 namespace titandb {
@@ -287,6 +288,7 @@ Status BlobGCJob::DoRunGC() {
   gc_iter->SeekToFirst();
   assert(gc_iter->Valid());
   for (; gc_iter->Valid(); gc_iter->Next()) {
+    TitanStopWatch sw(env_, metrics_.gc_write_blob_micros);
     if (IsShutingDown()) {
       s = Status::ShutdownInProgress();
       break;
@@ -649,6 +651,7 @@ void BlobGCJob::UpdateInternalOpStats() {
   gc_read_lsm += metrics_.gc_read_lsm_micros;
   gc_update_lsm += metrics_.gc_update_lsm_micros;
   gc_sample += metrics_.gc_sampling_micros;
+  gc_write_blob += metrics_.gc_write_blob_micros;
 }
 
 }  // namespace titandb
