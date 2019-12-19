@@ -17,6 +17,7 @@ enum Tag {
   kDeletedBlobFile = 12,  // Deprecated, leave here for backward compatibility
   kAddedBlobFileV2 = 13,  // Comparing to kAddedBlobFile, it newly includes
                           // smallest_key and largest_key of blob file
+  kUpdateDiscardableSize = 14,
 };
 
 class VersionEdit {
@@ -30,6 +31,10 @@ class VersionEdit {
 
   void AddBlobFile(std::shared_ptr<BlobFileMeta> file) {
     added_files_.push_back(file);
+  }
+
+  void UpdateBlobFile(uint64_t file_number, uint64_t discardable_size){
+    updated_discardable_size_.emplace(file_number, discardable_size);
   }
 
   void DeleteBlobFile(uint64_t file_number,
@@ -53,6 +58,7 @@ class VersionEdit {
 
   std::vector<std::shared_ptr<BlobFileMeta>> added_files_;
   std::vector<std::pair<uint64_t, SequenceNumber>> deleted_files_;
+  std::unordered_map<uint64_t, uint64_t> updated_discardable_size_;
 };
 
 }  // namespace titandb

@@ -885,7 +885,10 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
                  ((int)file->file_level() == cf_options.num_levels - 1
                       ? cf_options.blob_file_discardable_ratio
                       : cf_options.high_level_blob_discardable_ratio)) {
+        edit.UpdateBlobFile(bfs.first, bfs.second);
         file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
+      } else if (bfs.second > 0){
+        edit.UpdateBlobFile(bfs.first, bfs.second);
       }
     }
   }

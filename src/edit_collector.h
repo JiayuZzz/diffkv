@@ -34,6 +34,9 @@ class EditCollector {
       status_ = collector.DeleteFile(file.first, file.second);
       if (!status_.ok()) return status_;
     }
+    for (auto& discardable : edit.updated_discardable_size_) {
+      collector.UpdateFile(discardable.first, discardable.second);
+    }
 
     if (edit.has_next_file_number_) {
       if (edit.next_file_number_ < next_file_number_) {
@@ -127,6 +130,11 @@ class EditCollector {
       return Status::OK();
     }
 
+    Status UpdateFile(uint64_t file_number, uint64_t discardable){
+      updated_discardable_size_.emplace(file_number, discardable);
+      return Status::OK();
+    }
+
     Status Seal(BlobStorage* storage) {
       for (auto& file : added_files_) {
         auto number = file.first;
@@ -197,6 +205,12 @@ class EditCollector {
         }
       }
 
+      for (auto& discardable : updated_discardable_size_) {
+        auto file = storage->FindFile(discardable.first).lock();
+        if(!file) continue;
+        file->AddDiscardableSize(discardable.second);
+      }
+
       storage->ComputeGCScore();
       return Status::OK();
     }
@@ -204,6 +218,7 @@ class EditCollector {
    private:
     std::unordered_map<uint64_t, std::shared_ptr<BlobFileMeta>> added_files_;
     std::unordered_map<uint64_t, SequenceNumber> deleted_files_;
+    std::unordered_map<uint64_t, uint64_t> updated_discardable_size_;
   };
 
   Status status_{Status::OK()};
