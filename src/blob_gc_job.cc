@@ -581,10 +581,10 @@ Status BlobGCJob::RewriteValidKeyToLSM() {
     s = Status::OK();
   }
 
-  if (s.ok()) {
+  // if (s.ok()) {
     // Flush and sync WAL.
-    s = db_impl->FlushWAL(true /*sync*/);
-  }
+    // s = db_impl->FlushWAL(true /*sync*/);
+  // }
 
   return s;
 }
