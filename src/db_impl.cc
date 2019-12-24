@@ -40,6 +40,8 @@ std::atomic<uint64_t> range_merge_file{0};
 namespace rocksdb {
 namespace titandb {
 
+ThreadPool* TitanDBIterator::pool_ = new ThreadPool(32);
+
 class TitanDBImpl::FileManager : public BlobFileManager {
  public:
   FileManager(TitanDBImpl* db) : db_(db) {}
@@ -521,6 +523,16 @@ Status TitanDBImpl::CompactFiles(
   }
 
   return s;
+}
+
+int TitanDBImpl::Scan(const ReadOptions& options,const std::string& start_key, int len, std::vector<std::string>& keys, std::vector<std::string>& vals) {
+  if((int)keys.size()<len) keys.resize(len);
+  if((int)vals.size()<len) vals.resize(len);
+  auto iter = NewIterator(options);
+  int ret = len;
+  static_cast<TitanDBIterator*>(iter)->Scan(start_key, ret, keys, vals);
+  delete iter;
+  return ret;
 }
 
 Status TitanDBImpl::Put(const rocksdb::WriteOptions& options,

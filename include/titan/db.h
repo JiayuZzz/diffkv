@@ -27,6 +27,8 @@ class TitanDB : public StackableDB {
 
   TitanDB() : StackableDB(nullptr) {}
 
+  virtual int Scan(const ReadOptions& options, const std::string& start_key, int len, std::vector<std::string>& keys, std::vector<std::string>& vals) = 0;
+
   using StackableDB::CreateColumnFamily;
   Status CreateColumnFamily(const ColumnFamilyOptions& options,
                             const std::string& name,
