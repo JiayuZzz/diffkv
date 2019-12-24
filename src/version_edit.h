@@ -33,7 +33,7 @@ class VersionEdit {
     added_files_.push_back(file);
   }
 
-  void UpdateBlobFile(uint64_t file_number, uint64_t discardable_size){
+  void UpdateBlobFile(uint64_t file_number, uint64_t discardable_size) {
     updated_discardable_size_.emplace(file_number, discardable_size);
   }
 

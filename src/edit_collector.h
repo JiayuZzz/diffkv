@@ -130,7 +130,7 @@ class EditCollector {
       return Status::OK();
     }
 
-    Status UpdateFile(uint64_t file_number, uint64_t discardable){
+    Status UpdateFile(uint64_t file_number, uint64_t discardable) {
       updated_discardable_size_.emplace(file_number, discardable);
       return Status::OK();
     }
@@ -207,7 +207,7 @@ class EditCollector {
 
       for (auto& discardable : updated_discardable_size_) {
         auto file = storage->FindFile(discardable.first).lock();
-        if(!file) continue;
+        if (!file) continue;
         file->AddDiscardableSize(discardable.second);
       }
 

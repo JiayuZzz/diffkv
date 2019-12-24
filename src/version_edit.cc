@@ -20,7 +20,7 @@ void VersionEdit::EncodeTo(std::string* dst) const {
     // obsolete sequence is a inpersistent field, so no need to encode it.
     PutVarint32Varint64(dst, kDeletedBlobFile, file.first);
   }
-  for (auto & file:updated_discardable_size_) {
+  for (auto& file : updated_discardable_size_) {
     PutVarint32(dst, kUpdateDiscardableSize);
     PutVarint64(dst, file.first);
     PutVarint64(dst, file.second);
@@ -81,7 +81,8 @@ Status VersionEdit::DecodeFrom(Slice* src) {
         }
         break;
       case kUpdateDiscardableSize:
-        if (GetVarint64(src, &file_number)&&GetVarint64(src, &discardable_size)){
+        if (GetVarint64(src, &file_number) &&
+            GetVarint64(src, &discardable_size)) {
           updated_discardable_size_.emplace(file_number, discardable_size);
         } else {
           error = "update discardable size";

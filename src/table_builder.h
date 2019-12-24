@@ -163,7 +163,7 @@ class ForegroundBuilder {
                                     std::unique_ptr<BlobFileHandle>>>>
       finished_files_;
   std::hash<std::string> hash{};
-  std::vector<BlockQueue<Request*>> requests_;
+  std::vector<BlockQueue<Request *>> requests_;
   std::vector<std::thread> pool_{};
 
   void handleRequest(int i);

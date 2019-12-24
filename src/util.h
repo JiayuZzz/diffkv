@@ -30,11 +30,11 @@ class BlockQueue {
     cv_.Signal();
   }
 
-  std::vector<T> GetBulk(size_t max = 10){
+  std::vector<T> GetBulk(size_t max = 10) {
     std::vector<T> res;
     MutexLock ml(&mutex_);
-    while(q_.empty()) cv_.Wait();
-    for(size_t i=0;i<max&&!q_.empty();i++){
+    while (q_.empty()) cv_.Wait();
+    for (size_t i = 0; i < max && !q_.empty(); i++) {
       res.emplace_back(q_.front());
       q_.pop_front();
     }

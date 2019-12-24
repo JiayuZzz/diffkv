@@ -287,14 +287,14 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
   }
 
   s = blob_file_set_->Open(column_families);
-  if(db_options_.sep_before_flush){
-  for (auto cf : column_families) {
-    builders_.emplace(
-        cf.first, ForegroundBuilder(cf.first, blob_manager_,
-                                    blob_file_set_->GetBlobStorage(cf.first),
-                                    db_options_, cf.second));
-    builders_[cf.first].Init();
-  }
+  if (db_options_.sep_before_flush) {
+    for (auto cf : column_families) {
+      builders_.emplace(
+          cf.first, ForegroundBuilder(cf.first, blob_manager_,
+                                      blob_file_set_->GetBlobStorage(cf.first),
+                                      db_options_, cf.second));
+      builders_[cf.first].Init();
+    }
   }
   if (!s.ok()) return s;
 
@@ -887,7 +887,7 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
                       : cf_options.high_level_blob_discardable_ratio)) {
         edit.UpdateBlobFile(bfs.first, bfs.second);
         file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
-      } else if (bfs.second > 0){
+      } else if (bfs.second > 0) {
         edit.UpdateBlobFile(bfs.first, bfs.second);
       }
     }
@@ -1148,7 +1148,7 @@ void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
       } else {
         file->AddDiscardableSize(-f.second);
       }
-      if(file->file_type() == kSorted) assert(file->discardable_size()==0);
+      if (file->file_type() == kSorted) assert(file->discardable_size() == 0);
       file->FileStateTransit(BlobFileMeta::FileEvent::kFlushCompleted);
     }
   }
