@@ -95,7 +95,7 @@ class TitanDBIterator : public Iterator {
     void Scan(const Slice& target, int& len, std::vector<std::string>& keys, std::vector<std::string>& values) {
     files_.reserve(len);
     std::vector<BlobIndex> indexes(len);
-    std::vector<std::future<Status>> status;
+    std::vector<std::future<Status>> ss;
     int bulk = std::min(16,len/8);
     int i = 0;
     iter_->Seek(target);
@@ -121,12 +121,12 @@ class TitanDBIterator : public Iterator {
       keys[i] = iter_->key().ToString();
       i++;
       if(i%bulk==0||i==len){
-        status.emplace_back(pool_->addTask(&TitanDBIterator::BulkRead, this, std::ref(indexes),std::ref(keys),std::ref(values),i%bulk==0?(i-bulk):(i-i%bulk),i));
+        ss.emplace_back(pool_->addTask(&TitanDBIterator::BulkRead, this, std::ref(indexes),std::ref(keys),std::ref(values),i%bulk==0?(i-bulk):(i-i%bulk),i));
       }
       iter_->Next();
     }
     len = i;
-    for(auto& fs:status){
+    for(auto& fs:ss){
       auto s = fs.get();
     }
     return;
@@ -162,11 +162,11 @@ class TitanDBIterator : public Iterator {
     }
     len = i;
     int bulk = std::max(16,len/8);
-    std::vector<std::future<Status>> status;
+    std::vector<std::future<Status>> ss;
     for(int j=0;j<len;j+=bulk){
-      status.emplace_back(pool_->addTask(&TitanDBIterator::BulkRead, this, std::ref(indexes),std::ref(keys),std::ref(values),j,std::min(j+bulk, len)));
+      ss.emplace_back(pool_->addTask(&TitanDBIterator::BulkRead, this, std::ref(indexes),std::ref(keys),std::ref(values),j,std::min(j+bulk, len)));
     }
-    for(auto& fs:status){
+    for(auto& fs:ss){
       auto s = fs.get();
     }
     return;
