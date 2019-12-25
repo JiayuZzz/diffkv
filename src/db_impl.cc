@@ -953,7 +953,7 @@ void TitanDBImpl::MarkFileIfNeedMerge(
     } else {
       ++cur_remove;
       auto record = tmp.find(blob_ends[i].first);
-      if (cur_add - record->second > max_sorted_runs) {
+      if (cur_add - record->second > max_sorted_runs && record->first->file_state()!=BlobFileMeta::FileState::kObsolete) {
         marked++;
         record->first->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
       }
