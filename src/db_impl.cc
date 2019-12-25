@@ -525,9 +525,11 @@ Status TitanDBImpl::CompactFiles(
   return s;
 }
 
-int TitanDBImpl::Scan(const ReadOptions& options,const std::string& start_key, int len, std::vector<std::string>& keys, std::vector<std::string>& vals) {
-  if((int)keys.size()<len) keys.resize(len);
-  if((int)vals.size()<len) vals.resize(len);
+int TitanDBImpl::Scan(const ReadOptions& options, const std::string& start_key,
+                      int len, std::vector<std::string>& keys,
+                      std::vector<std::string>& vals) {
+  if ((int)keys.size() < len) keys.resize(len);
+  if ((int)vals.size() < len) vals.resize(len);
   auto iter = NewIterator(options);
   int ret = len;
   static_cast<TitanDBIterator*>(iter)->Scan(start_key, ret, keys, vals);
@@ -953,7 +955,9 @@ void TitanDBImpl::MarkFileIfNeedMerge(
     } else {
       ++cur_remove;
       auto record = tmp.find(blob_ends[i].first);
-      if (cur_add - record->second > max_sorted_runs && record->first->file_state()!=BlobFileMeta::FileState::kObsolete) {
+      if (cur_add - record->second > max_sorted_runs &&
+          record->first->file_state() != BlobFileMeta::FileState::kObsolete &&
+          record->first->file_state() != BlobFileMeta::FileState::kToMerge) {
         marked++;
         record->first->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
       }

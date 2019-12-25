@@ -54,7 +54,9 @@ class TitanDBImpl : public TitanDB {
 
   Status CloseImpl();
 
-  int Scan(const ReadOptions& options,const std::string& start_key, int len, std::vector<std::string>& keys, std::vector<std::string>& vals) override;
+  int Scan(const ReadOptions& options, const std::string& start_key, int len,
+           std::vector<std::string>& keys,
+           std::vector<std::string>& vals) override;
 
   using TitanDB::Put;
   Status Put(const WriteOptions& options, ColumnFamilyHandle* column_family,

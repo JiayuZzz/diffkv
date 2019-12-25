@@ -27,8 +27,7 @@ class BlockQueue {
   void Put(const T& item) {
     MutexLock ml(&mutex_);
     q_.push_back(item);
-    if(q_.size()==1)
-      cv_.SignalAll();
+    if (q_.size() == 1) cv_.SignalAll();
   }
 
   std::vector<T> GetBulk(size_t max = 32) {

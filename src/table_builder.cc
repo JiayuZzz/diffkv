@@ -115,7 +115,8 @@ void TitanTableBuilder::Add(const Slice &key, const Slice &value) {
         std::unique_ptr<BlobFilePrefetcher> prefetcher;
         status_ = storage->NewPrefetcher(index.file_number, &prefetcher);
         if (!status_.ok()) {
-          std::cerr << "create prefetcher error!" <<status_.ToString()<< std::endl;
+          std::cerr << "create prefetcher error!" << status_.ToString()
+                    << std::endl;
           base_builder_->Add(key, value);
           return;
         }

@@ -10,13 +10,13 @@
 #include <unordered_map>
 
 #include "db/db_iter.h"
+#include "future"
 #include "logging/logging.h"
 #include "rocksdb/env.h"
 #include "vector"
-#include "future"
 
-#include "titan_stats.h"
 #include "threadpool.h"
+#include "titan_stats.h"
 
 namespace rocksdb {
 namespace titandb {
@@ -91,15 +91,55 @@ class TitanDBIterator : public Iterator {
       // RecordTick(stats_, BLOB_DB_NUM_NEXT);
     }
   }
-/*
-    void Scan(const Slice& target, int& len, std::vector<std::string>& keys, std::vector<std::string>& values) {
-    files_.reserve(len);
+  /*
+      void Scan(const Slice& target, int& len, std::vector<std::string>& keys,
+    std::vector<std::string>& values) { files_.reserve(len);
+      std::vector<BlobIndex> indexes(len);
+      std::vector<std::future<Status>> ss;
+      int bulk = std::min(16,len/8);
+      int i = 0;
+      iter_->Seek(target);
+      while (i<len && Valid()) {
+        if (ShouldGetBlobValue()) {
+          assert(iter_->status().ok());
+          status_ = DecodeInto(iter_->value(), &indexes[i]);
+          if (!status_.ok()) {
+            return;
+          }
+          auto it = files_.find(indexes[i].file_number);
+          if (it == files_.end()) {
+            std::unique_ptr<BlobFilePrefetcher> prefetcher;
+            status_ = storage_->NewPrefetcher(indexes[i].file_number,
+    &prefetcher); if (!status_.ok()) { return;
+            }
+            it = files_.emplace(indexes[i].file_number,
+    std::move(prefetcher)).first;
+          }
+        } else {
+          values[i] = iter_->value().ToString();
+        }
+        keys[i] = iter_->key().ToString();
+        i++;
+        if(i%bulk==0||i==len){
+          ss.emplace_back(pool_->addTask(&TitanDBIterator::BulkRead, this,
+    std::ref(indexes),std::ref(keys),std::ref(values),i%bulk==0?(i-bulk):(i-i%bulk),i));
+        }
+        iter_->Next();
+      }
+      len = i;
+      for(auto& fs:ss){
+        auto s = fs.get();
+      }
+      return;
+    }
+    */
+  // /*
+  void Scan(const Slice& target, int& len, std::vector<std::string>& keys,
+            std::vector<std::string>& values) {
     std::vector<BlobIndex> indexes(len);
-    std::vector<std::future<Status>> ss;
-    int bulk = std::min(16,len/8);
     int i = 0;
     iter_->Seek(target);
-    while (i<len && Valid()) {
+    while (i < len && Valid()) {
       if (ShouldGetBlobValue()) {
         assert(iter_->status().ok());
         status_ = DecodeInto(iter_->value(), &indexes[i]);
@@ -109,49 +149,13 @@ class TitanDBIterator : public Iterator {
         auto it = files_.find(indexes[i].file_number);
         if (it == files_.end()) {
           std::unique_ptr<BlobFilePrefetcher> prefetcher;
-          status_ = storage_->NewPrefetcher(indexes[i].file_number, &prefetcher);
+          status_ =
+              storage_->NewPrefetcher(indexes[i].file_number, &prefetcher);
           if (!status_.ok()) {
             return;
           }
-          it = files_.emplace(indexes[i].file_number, std::move(prefetcher)).first;
-        }
-      } else {
-        values[i] = iter_->value().ToString();
-      }
-      keys[i] = iter_->key().ToString();
-      i++;
-      if(i%bulk==0||i==len){
-        ss.emplace_back(pool_->addTask(&TitanDBIterator::BulkRead, this, std::ref(indexes),std::ref(keys),std::ref(values),i%bulk==0?(i-bulk):(i-i%bulk),i));
-      }
-      iter_->Next();
-    }
-    len = i;
-    for(auto& fs:ss){
-      auto s = fs.get();
-    }
-    return;
-  }
-  */
-// /*
-  void Scan(const Slice& target, int& len, std::vector<std::string>& keys, std::vector<std::string>& values) {
-    std::vector<BlobIndex> indexes(len);
-    int i = 0;
-    iter_->Seek(target);
-    while (i<len && Valid()) {
-      if (ShouldGetBlobValue()) {
-        assert(iter_->status().ok());
-        status_ = DecodeInto(iter_->value(), &indexes[i]);
-        if (!status_.ok()) {
-          return;
-        }
-        auto it = files_.find(indexes[i].file_number);
-        if (it == files_.end()) {
-          std::unique_ptr<BlobFilePrefetcher> prefetcher;
-          status_ = storage_->NewPrefetcher(indexes[i].file_number, &prefetcher);
-          if (!status_.ok()) {
-            return;
-          }
-          it = files_.emplace(indexes[i].file_number, std::move(prefetcher)).first;
+          it = files_.emplace(indexes[i].file_number, std::move(prefetcher))
+                   .first;
         }
       } else {
         values[i] = iter_->value().ToString();
@@ -161,17 +165,19 @@ class TitanDBIterator : public Iterator {
       i++;
     }
     len = i;
-    int bulk = std::max(16,len/8);
+    int bulk = std::max(16, len / 8);
     std::vector<std::future<Status>> ss;
-    for(int j=0;j<len;j+=bulk){
-      ss.emplace_back(pool_->addTask(&TitanDBIterator::BulkRead, this, std::ref(indexes),std::ref(keys),std::ref(values),j,std::min(j+bulk, len)));
+    for (int j = 0; j < len; j += bulk) {
+      ss.emplace_back(pool_->addTask(
+          &TitanDBIterator::BulkRead, this, std::ref(indexes), std::ref(keys),
+          std::ref(values), j, std::min(j + bulk, len)));
     }
-    for(auto& fs:ss){
+    for (auto& fs : ss) {
       auto s = fs.get();
     }
     return;
   }
-// */
+  // */
   void Prev() override {
     assert(Valid());
     iter_->Prev();
@@ -195,16 +201,20 @@ class TitanDBIterator : public Iterator {
   }
 
  private:
-  Status BulkRead(const std::vector<BlobIndex>& indexes, std::vector<std::string>& keys, std::vector<std::string>& vals, int start, int end){
+  Status BulkRead(const std::vector<BlobIndex>& indexes,
+                  std::vector<std::string>& keys,
+                  std::vector<std::string>& vals, int start, int end) {
     PinnableSlice buffer;
     BlobRecord record;
     Status s;
-    for(int j=start;j<end;j++){
-      if(vals[j]==""){
+    for (int j = start; j < end; j++) {
+      if (vals[j] == "") {
         auto it = files_.find(indexes[j].file_number);
-        auto r = it->second->Get(options_, indexes[j].blob_handle, &record, &buffer);
-        if(!r.ok()) {s=r;}
-        else {
+        auto r =
+            it->second->Get(options_, indexes[j].blob_handle, &record, &buffer);
+        if (!r.ok()) {
+          s = r;
+        } else {
           vals[j] = record.value.ToString();
         }
       }
