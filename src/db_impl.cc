@@ -1310,10 +1310,12 @@ void TitanDBImpl::OnCompactionCompleted(
                               db_impl_->GetLatestSequenceNumber());
           continue;
         } else if (file->file_type() == kSorted &&
-                   static_cast<int>(file->file_level()) >=
-                       cf_options.num_levels - 2 &&
-                   file->GetDiscardableRatio() >
-                       cf_options.blob_file_discardable_ratio) {
+                   (file->GetDiscardableRatio() >
+                        cf_options.high_level_blob_discardable_ratio ||
+                    (static_cast<int>(file->file_level()) >=
+                         cf_options.num_levels - 2 &&
+                     file->GetDiscardableRatio() >
+                         cf_options.blob_file_discardable_ratio))) {
           mark++;
           file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
         }
