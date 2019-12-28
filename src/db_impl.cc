@@ -1332,7 +1332,7 @@ void TitanDBImpl::OnCompactionCompleted(
       blob_file_set_->LogAndApply(edit);
       MarkFileIfNeedMerge(files, cf_options.max_sorted_runs);
     }
-    if (!cf_options.level_merge || db_options_.sep_before_flush) {
+    if ((!cf_options.level_merge&&bytes_written.load()>((uint64_t)130<<30)) || (cf_options.level_merge&&db_options_.sep_before_flush)) {
       if (bs->ComputeGCScore() >
           cf_options.min_gc_batch_size / cf_options.blob_file_target_size) {
         AddToGCQueue(compaction_job_info.cf_id);
