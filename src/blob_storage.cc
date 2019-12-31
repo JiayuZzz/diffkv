@@ -226,25 +226,45 @@ bool BlobStorage::RemoveFile(uint64_t file_number) {
 
 void BlobStorage::PrintFileStates() {
     MutexLock l(&mutex_);
-    int numObsolete = 0;
-    int numNeedMerge = 0;
-    uint64_t discardable_size = 0;
+    std::vector<int> numObsolete(cf_options_.num_levels);
+    std::vector<int> numNeedMerge(cf_options_.num_levels);
+    std::vector<int> numNeedGC(cf_options_.num_levels);
+    std::vector<int> numFile(cf_options_.num_levels);
+    std::vector<uint64_t> gc_discardable_size(cf_options_.num_levels);
+    std::vector<uint64_t> nomark_discardable_size(cf_options_.num_levels);
+    std::vector<uint64_t> merge_discardable_size(cf_options_.num_levels);
+    std::vector<uint64_t> reach_without_mark(cf_options_.num_levels);
     for (auto& file:files_){
+      int level = file.second->file_level();
+      numFile[level]++;
       switch (file.second->file_state())
       {
       case BlobFileMeta::FileState::kObsolete:
-        numObsolete++;
+        numObsolete[level]++;
         break;
       case BlobFileMeta::FileState::kToMerge:
-        numNeedMerge++;
-        discardable_size+=file.second->discardable_size();
+        numNeedMerge[level]++;
+        merge_discardable_size[level]+=file.second->discardable_size();
+        break;
+      case BlobFileMeta::FileState::kToGC:
+        numNeedGC[level]++;
+        gc_discardable_size[level]+=file.second->discardable_size();
         break;
       default:
+        nomark_discardable_size[level]+=file.second->discardable_size();
+        if(file.second->GetDiscardableRatio()>cf_options_.blob_file_discardable_ratio){
+          reach_without_mark[level]++;
+        }
         break;
       }
     }
-    std::cout<<"numBlobsolete files "<<numObsolete<<", num need merge files "<<numNeedMerge<<", discardable size of needmerge "<<discardable_size<<"."<<std::endl;
-    std::cout<<"obsolete files in storage records:"<<obsolete_files_.size()<<std::endl;
+    std::cout<<"gc and merge status"<<std::endl;
+    for(int i=0;i<cf_options_.num_levels;i++){
+      std::cout<<"level "<<i<<" has "<<numFile[i]<<" files"<<std::endl;
+      std::cout<<"numBlobsolete files "<<numObsolete[i]<<"\nnum need merge files "<<numNeedMerge[i]<<"\nnum need gc files "<<numNeedGC[i]<<"\ndiscardable size of need gc "<<gc_discardable_size[i]<<"\ndiscardable size of need merge "<<merge_discardable_size[i]<<"\ndiscardable size of no mark "<<nomark_discardable_size[i]<<"."<<std::endl;
+      std::cout<<"reach gc thresh but no mark files:"<<reach_without_mark[i]<<std::endl;
+    }
+    std::cout<<"num blob files"<<files_.size()<<", obsolete files in storage records:"<<obsolete_files_.size()<<std::endl;
   }
 
 void BlobStorage::GetObsoleteFiles(std::vector<std::string> *obsolete_files,

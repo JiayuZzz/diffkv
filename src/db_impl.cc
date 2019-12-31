@@ -175,7 +175,6 @@ TitanDBImpl::~TitanDBImpl() {
     builder.second.Finish();
   }
   PurgeObsoleteFiles();
-  blob_file_set_->PrintFileStates();
   Close();
 }
 
@@ -902,7 +901,7 @@ Status TitanDBImpl::DeleteFilesInRanges(ColumnFamilyHandle* column_family,
                       ? cf_options.blob_file_discardable_ratio
                       : cf_options.high_level_blob_discardable_ratio)) {
         edit.UpdateBlobFile(bfs.first, bfs.second);
-        file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
+        file->FileStateTransit(BlobFileMeta::FileEvent::kNeedGC);
       } else if (bfs.second > 0) {
         edit.UpdateBlobFile(bfs.first, bfs.second);
       }
@@ -959,7 +958,8 @@ void TitanDBImpl::MarkFileIfNeedMerge(
       auto record = tmp.find(blob_ends[i].first);
       if (cur_add - record->second > max_sorted_runs &&
           record->first->file_state() != BlobFileMeta::FileState::kObsolete &&
-          record->first->file_state() != BlobFileMeta::FileState::kToMerge) {
+          record->first->file_state() != BlobFileMeta::FileState::kToMerge &&
+          record->first->file_state() != BlobFileMeta::FileState::kToGC) {
         marked++;
         record->first->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
       }
@@ -1077,6 +1077,7 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
             << foreground_blob_finish_time / 1000000.0 << std::endl;
   std::cout << "range merge marked file: " << range_merge_file << std::endl;
   std::cout << "gc marked file: " << gc_mark_file << std::endl;
+  blob_file_set_->PrintFileStates();
   assert(column_family != nullptr);
   bool s = false;
   /*
@@ -1318,7 +1319,7 @@ void TitanDBImpl::OnCompactionCompleted(
                      file->GetDiscardableRatio() >
                          cf_options.blob_file_discardable_ratio))) {
           mark++;
-          file->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
+          file->FileStateTransit(BlobFileMeta::FileEvent::kNeedGC);
         }
         if (count_sorted_run && file->file_type() == kSorted) {
           files.emplace_back(std::move(file));

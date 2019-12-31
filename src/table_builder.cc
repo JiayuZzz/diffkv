@@ -281,9 +281,9 @@ bool TitanTableBuilder::ShouldMerge(
   return file != nullptr && file->file_type() == kSorted &&
          ((target_level_ >= merge_level_ &&
            (static_cast<int>(file->file_level()) < target_level_ ||
-            file->file_state() == BlobFileMeta::FileState::kToMerge)) ||
+            file->file_state() == BlobFileMeta::FileState::kToMerge||file->file_state() == BlobFileMeta::FileState::kToGC)) ||
           (static_cast<int>(file->file_level()) < target_level_ &&
-           file->file_state() == BlobFileMeta::FileState::kToMerge));
+           file->file_state() == BlobFileMeta::FileState::kToGC));
 }
 
 void TitanTableBuilder::UpdateInternalOpStats() {

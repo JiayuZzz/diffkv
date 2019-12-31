@@ -171,6 +171,7 @@ class BlobFileMeta {
     kDelete,
     kNeedMerge,
     kReset,  // reset file to normal for test
+    kNeedGC,
   };
 
   enum class FileState {
@@ -181,6 +182,7 @@ class BlobFileMeta {
     kPendingGC,   // output of gc, waiting gc finish and keys adding to LSM
     kObsolete,    // already gced, but wait to be physical deleted
     kToMerge,     // need merge to new blob file in next compaction
+    kToGC,
   };
 
   BlobFileMeta() = default;
