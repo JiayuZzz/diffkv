@@ -87,6 +87,12 @@ class BlobFileSet {
     return obsolete_columns_.count(cf_id) > 0;
   }
 
+  void PrintFileStates() {
+    for(auto& cf:column_families_){
+      cf.second->PrintFileStates();
+    }
+  }
+
  private:
   friend class BlobFileSizeCollectorTest;
   friend class VersionTest;

@@ -224,6 +224,29 @@ bool BlobStorage::RemoveFile(uint64_t file_number) {
   return true;
 }
 
+void BlobStorage::PrintFileStates() {
+    MutexLock l(&mutex_);
+    int numObsolete = 0;
+    int numNeedMerge = 0;
+    uint64_t discardable_size = 0;
+    for (auto& file:files_){
+      switch (file.second->file_state())
+      {
+      case BlobFileMeta::FileState::kObsolete:
+        numObsolete++;
+        break;
+      case BlobFileMeta::FileState::kToMerge:
+        numNeedMerge++;
+        discardable_size+=file.second->discardable_size();
+        break;
+      default:
+        break;
+      }
+    }
+    std::cout<<"numBlobsolete files "<<numObsolete<<", num need merge files "<<numNeedMerge<<", discardable size of needmerge "<<discardable_size<<"."<<std::endl;
+    std::cout<<"obsolete files in storage records:"<<obsolete_files_.size()<<std::endl;
+  }
+
 void BlobStorage::GetObsoleteFiles(std::vector<std::string> *obsolete_files,
                                    SequenceNumber oldest_sequence) {
   MutexLock l(&mutex_);

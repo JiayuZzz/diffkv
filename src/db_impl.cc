@@ -175,6 +175,7 @@ TitanDBImpl::~TitanDBImpl() {
     builder.second.Finish();
   }
   PurgeObsoleteFiles();
+  blob_file_set_->PrintFileStates();
   Close();
 }
 

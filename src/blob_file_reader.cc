@@ -158,6 +158,18 @@ Status BlobFileReader::ReadRecord(const BlobHandle& handle, BlobRecord* record,
   return s;
 }
 
+void BlobFilePrefetcher::Prefetch(const BlobHandle& handle){
+  reader_->file_->Prefetch(handle.offset, handle.size);
+}
+
+Status BlobFilePrefetcher::PointGet(const ReadOptions& options, const BlobHandle& handle, BlobRecord* record, PinnableSlice* buffer) {
+  if (only_value_)
+    record->only_value = true;
+  else
+    record->only_value = false;
+  return reader_->Get(options, handle, record, buffer);
+}
+
 Status BlobFilePrefetcher::Get(const ReadOptions& options,
                                const BlobHandle& handle, BlobRecord* record,
                                PinnableSlice* buffer) {

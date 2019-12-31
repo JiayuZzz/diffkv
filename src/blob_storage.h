@@ -46,6 +46,8 @@ class BlobStorage {
 
   const TitanDBOptions& db_options() { return db_options_; }
 
+  void PrintFileStates();
+
   const TitanCFOptions& cf_options() { return cf_options_; }
 
   const std::vector<GCScore> gc_score() {

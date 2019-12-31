@@ -62,6 +62,10 @@ class BlobFilePrefetcher : public Cleanable {
   Status Get(const ReadOptions& options, const BlobHandle& handle,
              BlobRecord* record, PinnableSlice* buffer);
 
+  void Prefetch(const BlobHandle& handle);
+
+  Status PointGet(const ReadOptions& options, const BlobHandle& handle, BlobRecord* record, PinnableSlice* buffer);
+
  private:
   BlobFileReader* reader_;
   uint64_t last_offset_{0};

@@ -91,49 +91,51 @@ class TitanDBIterator : public Iterator {
       // RecordTick(stats_, BLOB_DB_NUM_NEXT);
     }
   }
-  /*
-      void Scan(const Slice& target, int& len, std::vector<std::string>& keys,
-    std::vector<std::string>& values) { files_.reserve(len);
-      std::vector<BlobIndex> indexes(len);
-      std::vector<std::future<Status>> ss;
-      int bulk = std::min(16,len/8);
-      int i = 0;
-      iter_->Seek(target);
-      while (i<len && Valid()) {
-        if (ShouldGetBlobValue()) {
-          assert(iter_->status().ok());
-          status_ = DecodeInto(iter_->value(), &indexes[i]);
+
+void Scan(const Slice& target, int& len, std::vector<std::string>& keys,
+            std::vector<std::string>& values) {
+    std::vector<BlobIndex> indexes(len);
+    int i = 0;
+    iter_->Seek(target);
+    while (i < len && Valid()) {
+      if (ShouldGetBlobValue()) {
+        assert(iter_->status().ok());
+        status_ = DecodeInto(iter_->value(), &indexes[i]);
+        if (!status_.ok()) {
+          return;
+        }
+        auto it = files_.find(indexes[i].file_number);
+        if (it == files_.end()) {
+          std::unique_ptr<BlobFilePrefetcher> prefetcher;
+          status_ =
+              storage_->NewPrefetcher(indexes[i].file_number, &prefetcher);
           if (!status_.ok()) {
             return;
           }
-          auto it = files_.find(indexes[i].file_number);
-          if (it == files_.end()) {
-            std::unique_ptr<BlobFilePrefetcher> prefetcher;
-            status_ = storage_->NewPrefetcher(indexes[i].file_number,
-    &prefetcher); if (!status_.ok()) { return;
-            }
-            it = files_.emplace(indexes[i].file_number,
-    std::move(prefetcher)).first;
-          }
-        } else {
-          values[i] = iter_->value().ToString();
+          it = files_.emplace(indexes[i].file_number, std::move(prefetcher))
+                   .first;
         }
-        keys[i] = iter_->key().ToString();
-        i++;
-        if(i%bulk==0||i==len){
-          ss.emplace_back(pool_->addTask(&TitanDBIterator::BulkRead, this,
-    std::ref(indexes),std::ref(keys),std::ref(values),i%bulk==0?(i-bulk):(i-i%bulk),i));
-        }
-        iter_->Next();
+        it->second->Prefetch(indexes[i].blob_handle);
+      } else {
+        values[i] = iter_->value().ToString();
       }
-      len = i;
-      for(auto& fs:ss){
-        auto s = fs.get();
-      }
-      return;
+      keys[i] = iter_->key().ToString();
+      iter_->Next();
+      i++;
     }
-    */
-  // /*
+    len = i;
+    BlobRecord record;
+    PinnableSlice buffer;
+    for (int j=0;j<len;j++){
+      if(values[j].empty()){
+        auto it = files_.find(indexes[j].file_number);
+        it->second->PointGet(options_, indexes[j].blob_handle, &record, &buffer);
+        values[j] = std::move(record.value.ToString());
+      }
+    }
+  }
+
+/*
   void Scan(const Slice& target, int& len, std::vector<std::string>& keys,
             std::vector<std::string>& values) {
     std::vector<BlobIndex> indexes(len);
@@ -177,6 +179,7 @@ class TitanDBIterator : public Iterator {
     }
     return;
   }
+  */
   // */
   void Prev() override {
     assert(Valid());
