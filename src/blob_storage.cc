@@ -150,6 +150,7 @@ void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta> &file) {
   AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_FILE_SIZE,
            file->file_size());
   AddStats(stats_, cf_id_, TitanInternalStats::NUM_LIVE_BLOB_FILE, 1);
+  level_blob_size_[file->file_level()] += file->file_size();
   if (db_options_.sep_before_flush) {
     building_files_.erase(file->file_number());
   }
@@ -199,6 +200,7 @@ void BlobStorage::MarkFileObsoleteLocked(std::shared_ptr<BlobFileMeta> file,
   AddStats(stats_, cf_id_, TitanInternalStats::OBSOLETE_BLOB_FILE_SIZE,
            file->file_size());
   AddStats(stats_, cf_id_, TitanInternalStats::NUM_OBSOLETE_BLOB_FILE, 1);
+  level_blob_size_[file->file_level()] -= file->file_size();
 }
 
 bool BlobStorage::RemoveFile(uint64_t file_number) {

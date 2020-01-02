@@ -32,7 +32,9 @@ class TitanTableBuilder : public TableBuilder {
         stats_(stats),
         target_level_(target_level),
         merge_level_(merge_level),
-        start_level_(start_level) {}
+        start_level_(start_level) {
+          merge_low_level_ = blob_storage_.lock()->ShouldGCLowLevel();
+        }
 
   void Add(const Slice &key, const Slice &value) override;
 
@@ -80,6 +82,8 @@ class TitanTableBuilder : public TableBuilder {
   TitanStats *stats_;
   std::unordered_map<uint64_t, std::unique_ptr<BlobFilePrefetcher>>
       merging_files_;
+  std::unordered_map<uint64_t, std::shared_ptr<BlobFileMeta>> encountered_files_;
+  bool merge_low_level_;
   uint64_t blob_merge_time_{0};
   uint64_t blob_read_time_{0};
   uint64_t blob_add_time_{0};

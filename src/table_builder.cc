@@ -92,7 +92,8 @@ void TitanTableBuilder::Add(const Slice &key, const Slice &value) {
       base_builder_->Add(index_key, index_value);
     }
   } else if (ikey.type == kTypeBlobIndex && cf_options_.level_merge &&
-             /*start_level_ != 0 &&*/ target_level_ >= merge_level_ &&
+             /*start_level_ != 0 && target_level_ >= merge_level_ &&*/
+             (target_level_ >= merge_level_ || merge_low_level_) &&
              cf_options_.blob_run_mode == TitanBlobRunMode::kNormal) {
     // we merge value to new blob file
     BlobIndex index;
@@ -106,13 +107,18 @@ void TitanTableBuilder::Add(const Slice &key, const Slice &value) {
     // base_builder_->Add(key, value);
     // return;
     // }
-    auto storage = blob_storage_.lock();
-    assert(storage != nullptr);
-    auto blob_file = storage->FindFile(index.file_number).lock();
-    if (ShouldMerge(blob_file)) {
+    auto file_it = encountered_files_.find(index.file_number);
+    if(file_it == encountered_files_.end()){
+      auto storage = blob_storage_.lock();
+      assert(storage != nullptr);
+      auto file = storage->FindFile(index.file_number).lock();
+      file_it = encountered_files_.emplace(index.file_number, std::move(file)).first;
+    }
+    if (ShouldMerge(file_it->second)) {
       auto it = merging_files_.find(index.file_number);
       if (it == merging_files_.end()) {
         std::unique_ptr<BlobFilePrefetcher> prefetcher;
+        auto storage = blob_storage_.lock();
         status_ = storage->NewPrefetcher(index.file_number, &prefetcher);
         if (!status_.ok()) {
           std::cerr << "create prefetcher error!" << status_.ToString()
@@ -278,12 +284,9 @@ bool TitanTableBuilder::ShouldMerge(
   // 1. Corresponding keys are being compacted to last two level from lower
   // level
   // 2. Blob file is marked by GC or range merge
-  return file != nullptr && file->file_type() == kSorted &&
-         ((target_level_ >= merge_level_ &&
+  return file != nullptr && file->file_type() == kSorted && 
            (static_cast<int>(file->file_level()) < target_level_ ||
-            file->file_state() == BlobFileMeta::FileState::kToMerge||file->file_state() == BlobFileMeta::FileState::kToGC)) ||
-          (static_cast<int>(file->file_level()) < target_level_ &&
-           file->file_state() == BlobFileMeta::FileState::kToGC));
+            file->file_state() == BlobFileMeta::FileState::kToMerge||file->file_state() == BlobFileMeta::FileState::kToGC);
 }
 
 void TitanTableBuilder::UpdateInternalOpStats() {
