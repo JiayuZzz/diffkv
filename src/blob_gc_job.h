@@ -11,6 +11,7 @@
 #include "titan/options.h"
 #include "titan_stats.h"
 #include "version_edit.h"
+#include "table_builder.h"
 
 namespace rocksdb {
 namespace titandb {
@@ -21,7 +22,7 @@ class BlobGCJob {
             const TitanDBOptions& titan_db_options, Env* env,
             const EnvOptions& env_options, BlobFileManager* blob_file_manager,
             BlobFileSet* blob_file_set, LogBuffer* log_buffer,
-            std::atomic_bool* shuting_down, TitanStats* stats);
+            std::atomic_bool* shuting_down, TitanStats* stats, ForegroundBuilder* builder);
 
   // No copying allowed
   BlobGCJob(const BlobGCJob&) = delete;
@@ -63,6 +64,7 @@ class BlobGCJob {
 
   TitanStats* stats_;
 
+
   struct {
     uint64_t bytes_read = 0;
     uint64_t bytes_written = 0;
@@ -86,6 +88,9 @@ class BlobGCJob {
   uint64_t prev_bytes_written_ = 0;
   uint64_t io_bytes_read_ = 0;
   uint64_t io_bytes_written_ = 0;
+
+  ForegroundBuilder* builder_;
+
 
   Status SampleCandidateFiles();
   Status DoSample(const BlobFileMeta* file, bool* selected);

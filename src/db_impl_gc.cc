@@ -116,7 +116,7 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
       BlobGCJob blob_gc_job(blob_gc.get(), db_, &mutex_, db_options_, env_,
                             env_options_, blob_manager_.get(),
                             blob_file_set_.get(), log_buffer, &shuting_down_,
-                            stats_.get());
+                            stats_.get(), &builders_[column_family_id]);
       s = blob_gc_job.Prepare();
       if (s.ok()) {
         // std::cerr<<"run gc"<<std::endl;

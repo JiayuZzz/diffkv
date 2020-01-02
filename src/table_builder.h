@@ -106,6 +106,7 @@ class TitanTableBuilder : public TableBuilder {
 
 class ForegroundBuilder {
  public:
+  friend class BlobGCJob;
   struct Request {
     Slice key;
     Slice val;

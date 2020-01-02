@@ -85,7 +85,7 @@ BlobGCJob::BlobGCJob(BlobGC* blob_gc, DB* db, port::Mutex* mutex,
                      const EnvOptions& env_options,
                      BlobFileManager* blob_file_manager,
                      BlobFileSet* blob_file_set, LogBuffer* log_buffer,
-                     std::atomic_bool* shuting_down, TitanStats* stats)
+                     std::atomic_bool* shuting_down, TitanStats* stats, ForegroundBuilder* builder)
     : blob_gc_(blob_gc),
       base_db_(db),
       base_db_impl_(reinterpret_cast<DBImpl*>(base_db_)),
@@ -97,7 +97,8 @@ BlobGCJob::BlobGCJob(BlobGC* blob_gc, DB* db, port::Mutex* mutex,
       blob_file_set_(blob_file_set),
       log_buffer_(log_buffer),
       shuting_down_(shuting_down),
-      stats_(stats) {}
+      stats_(stats),
+      builder_(builder) {}
 
 BlobGCJob::~BlobGCJob() {
   if (log_buffer_) {
@@ -257,6 +258,7 @@ Status BlobGCJob::DoSample(const BlobFileMeta* file, bool* selected) {
 
 Status BlobGCJob::DoRunGC() {
   Status s;
+  WriteOptions wo;
 
   std::unique_ptr<BlobFileMergeIterator> gc_iter;
   s = BuildIterator(&gc_iter);
@@ -318,6 +320,15 @@ Status BlobGCJob::DoRunGC() {
     }
 
     last_key_valid = true;
+    if(db_options_.sep_before_flush&&!builder_->cf_options_.level_merge){
+      auto wb = WriteBatch();
+      if (builder_->Add(gc_iter->key(), gc_iter->value(), &wb).ok()) {
+        TitanStopWatch w(env_, metrics_.gc_update_lsm_micros);
+        s = base_db_->Write(wo, &wb);
+        // if(!s.ok()) return s;
+      }
+      continue;
+    }
 
     // Rewrite entry to new blob file
     if ((!blob_file_handle && !blob_file_builder) ||
@@ -449,7 +460,9 @@ Status BlobGCJob::DiscardEntry(const Slice& key, const BlobIndex& blob_index,
 // added to db before we rewrite any key to LSM
 Status BlobGCJob::Finish() {
   Status s;
-  {
+  if(db_options_.sep_before_flush&&!builder_->cf_options_.level_merge){
+
+  } else {
     mutex_->Unlock();
     s = InstallOutputBlobFiles();
     if (s.ok()) {
