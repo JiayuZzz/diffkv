@@ -11,17 +11,16 @@ namespace titandb {
 extern Env *env_;
 
 bool BlobStorage::ShouldGCLowLevel() {
-    MutexLock l(&mutex_);
     uint64_t low_size = 0;
     uint64_t high_size = 0;
     int i;
     for(i=0;i<cf_options_.num_levels-2;i++){
-      low_size += level_blob_size_[i];
+      low_size += level_blob_size_[i].load();
     }
     for(;i<cf_options_.num_levels;i++){
-      high_size += level_blob_size_[i];
+      high_size += level_blob_size_[i].load();
     }
-    std::cerr<<"level size:"<<low_size<<" "<<high_size<<std::endl;
+    // std::cerr<<"level size:"<<low_size<<" "<<high_size<<std::endl;
     return high_size>low_size&&low_size>0&&high_size/low_size<=10;
   }
 
@@ -165,7 +164,7 @@ void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta> &file) {
   AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_FILE_SIZE,
            file->file_size());
   AddStats(stats_, cf_id_, TitanInternalStats::NUM_LIVE_BLOB_FILE, 1);
-  level_blob_size_[file->file_level()] += file->file_size();
+  level_blob_size_[file->file_level()].fetch_add(file->file_size());
   if (db_options_.sep_before_flush) {
     building_files_.erase(file->file_number());
   }
@@ -215,7 +214,7 @@ void BlobStorage::MarkFileObsoleteLocked(std::shared_ptr<BlobFileMeta> file,
   AddStats(stats_, cf_id_, TitanInternalStats::OBSOLETE_BLOB_FILE_SIZE,
            file->file_size());
   AddStats(stats_, cf_id_, TitanInternalStats::NUM_OBSOLETE_BLOB_FILE, 1);
-  level_blob_size_[file->file_level()] -= file->file_size();
+  level_blob_size_[file->file_level()].fetch_sub(file->file_size());
 }
 
 bool BlobStorage::RemoveFile(uint64_t file_number) {
