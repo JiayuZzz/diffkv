@@ -10,6 +10,21 @@ namespace titandb {
 
 extern Env *env_;
 
+bool BlobStorage::ShouldGCLowLevel() {
+    MutexLock l(&mutex_);
+    uint64_t low_size = 0;
+    uint64_t high_size = 0;
+    int i;
+    for(i=0;i<cf_options_.num_levels-2;i++){
+      low_size += level_blob_size_[i];
+    }
+    for(;i<cf_options_.num_levels;i++){
+      high_size += level_blob_size_[i];
+    }
+    std::cerr<<"level size:"<<low_size<<" "<<high_size<<std::endl;
+    return high_size>low_size&&low_size>0&&high_size/low_size<=10;
+  }
+
 Status BlobStorage::Get(const ReadOptions &options, const BlobIndex &index,
                         BlobRecord *record, PinnableSlice *buffer) {
   auto sfile = FindFile(index.file_number).lock();

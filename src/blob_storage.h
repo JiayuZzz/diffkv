@@ -74,19 +74,7 @@ class BlobStorage {
   // corruption if the file doesn't exist.
   std::weak_ptr<BlobFileMeta> FindFile(uint64_t file_number) const;
 
-  bool ShouldGCLowLevel() {
-    MutexLock l(&mutex_);
-    uint64_t low_size = 0;
-    uint64_t high_size = 0;
-    int i;
-    for(i=0;i<cf_options_.num_levels-2;i++){
-      low_size += level_blob_size_[i];
-    }
-    for(;i<cf_options_.num_levels;i++){
-      high_size += level_blob_size_[i];
-    }
-    return high_size>low_size&&low_size>0&&high_size/low_size<=10;
-  }
+  bool ShouldGCLowLevel();
 
   std::weak_ptr<RandomAccessFileReader> FindBuildingFile(
       uint64_t file_number) const;
@@ -209,7 +197,7 @@ class BlobStorage {
 
   TitanStats* stats_;
 
-  std::vector<uint64_t> level_blob_size_;
+  std::vector<std::atomic<uint64_t>> level_blob_size_;
 };
 
 }  // namespace titandb

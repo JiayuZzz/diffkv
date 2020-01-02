@@ -559,7 +559,8 @@ Status BlobGCJob::RewriteValidKeyToLSM() {
       s = Status::ShutdownInProgress();
       break;
     }
-    s = db_impl->WriteWithCallback(wo, &write_batch.first, &write_batch.second);
+    // s = db_impl->WriteWithCallback(wo, &write_batch.first, &write_batch.second);
+    s = db_impl->Write(wo, &write_batch.first);
     if (s.ok()) {
       // count written bytes for new blob index.
       metrics_.bytes_written += write_batch.first.GetDataSize();
