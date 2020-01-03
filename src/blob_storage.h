@@ -37,7 +37,7 @@ class BlobStorage {
         file_cache_(_file_cache),
         destroyed_(false),
         stats_(stats),
-        level_blob_size_(cf_options_.num_levels) {}
+        level_blob_size_(cf_options_.num_levels+1) {}
 
   ~BlobStorage() {
     for (auto& file : files_) {

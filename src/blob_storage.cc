@@ -17,7 +17,7 @@ bool BlobStorage::ShouldGCLowLevel() {
     for(i=0;i<cf_options_.num_levels-2;i++){
       low_size += level_blob_size_[i].load();
     }
-    for(;i<cf_options_.num_levels;i++){
+    for(;i<cf_options_.num_levels+1;i++){
       high_size += level_blob_size_[i].load();
     }
     // std::cerr<<"level size:"<<low_size<<" "<<high_size<<std::endl;
@@ -164,7 +164,11 @@ void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta> &file) {
   AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_FILE_SIZE,
            file->file_size());
   AddStats(stats_, cf_id_, TitanInternalStats::NUM_LIVE_BLOB_FILE, 1);
+  if(file->file_type()==kSorted){
   level_blob_size_[file->file_level()].fetch_add(file->file_size());
+  } else {
+    level_blob_size_[cf_options_.num_levels].fetch_sub(file->file_size());
+  }
   if (db_options_.sep_before_flush) {
     building_files_.erase(file->file_number());
   }
@@ -214,7 +218,11 @@ void BlobStorage::MarkFileObsoleteLocked(std::shared_ptr<BlobFileMeta> file,
   AddStats(stats_, cf_id_, TitanInternalStats::OBSOLETE_BLOB_FILE_SIZE,
            file->file_size());
   AddStats(stats_, cf_id_, TitanInternalStats::NUM_OBSOLETE_BLOB_FILE, 1);
-  level_blob_size_[file->file_level()].fetch_sub(file->file_size());
+  if(file->file_type()==kSorted){
+    level_blob_size_[file->file_level()].fetch_sub(file->file_size());
+  } else {
+    level_blob_size_[cf_options_.num_levels].fetch_sub(file->file_size());
+  }
 }
 
 bool BlobStorage::RemoveFile(uint64_t file_number) {
@@ -250,7 +258,14 @@ void BlobStorage::PrintFileStates() {
     std::vector<uint64_t> nomark_discardable_size(cf_options_.num_levels);
     std::vector<uint64_t> merge_discardable_size(cf_options_.num_levels);
     std::vector<uint64_t> reach_without_mark(cf_options_.num_levels);
+    uint64_t num_unsorted = 0;
+    uint64_t discardable_unsorted = 0;
     for (auto& file:files_){
+      if(file.second->file_type()==kUnSorted){
+        num_unsorted++;
+        discardable_unsorted += file.second->discardable_size();
+        continue;
+      }
       int level = file.second->file_level();
       numFile[level]++;
       switch (file.second->file_state())
@@ -280,6 +295,7 @@ void BlobStorage::PrintFileStates() {
       std::cout<<"numBlobsolete files "<<numObsolete[i]<<"\nnum need merge files "<<numNeedMerge[i]<<"\nnum need gc files "<<numNeedGC[i]<<"\ndiscardable size of need gc "<<gc_discardable_size[i]<<"\ndiscardable size of need merge "<<merge_discardable_size[i]<<"\ndiscardable size of no mark "<<nomark_discardable_size[i]<<"."<<std::endl;
       std::cout<<"reach gc thresh but no mark files:"<<reach_without_mark[i]<<std::endl;
     }
+    std::cout<<"unsorted file "<<num_unsorted<<"\n discardable "<<discardable_unsorted<<std::endl;
     std::cout<<"num blob files"<<files_.size()<<", obsolete files in storage records:"<<obsolete_files_.size()<<std::endl;
   }
 

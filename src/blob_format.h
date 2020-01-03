@@ -5,6 +5,7 @@
 #include "rocksdb/status.h"
 #include "table/format.h"
 #include "util.h"
+#include "atomic"
 
 namespace rocksdb {
 namespace titandb {
@@ -244,7 +245,7 @@ class BlobFileMeta {
   std::string largest_key_;
 
   // Not persistent field
-  FileState state_{FileState::kInit};
+  std::atomic<FileState> state_{FileState::kInit};
 
   uint64_t discardable_size_{0};
   // gc_mark is set to true when this file is recovered from re-opening the DB
