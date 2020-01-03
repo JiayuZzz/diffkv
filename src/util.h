@@ -30,14 +30,11 @@ class BlockQueue {
     if (q_.size() == 1) cv_.SignalAll();
   }
 
-  std::vector<T> GetBulk(size_t max = 32) {
-    std::vector<T> res;
+  std::list<T> GetBulk(size_t max = 32) {
+    std::list<T> res;
     MutexLock ml(&mutex_);
     while (q_.empty()) cv_.Wait();
-    for (size_t i = 0; i < max && !q_.empty(); i++) {
-      res.emplace_back(q_.front());
-      q_.pop_front();
-    }
+    res.splice(res.begin(), q_);
     return std::move(res);
   }
 

@@ -1312,13 +1312,14 @@ void TitanDBImpl::OnCompactionCompleted(
                               db_impl_->GetLatestSequenceNumber());
           continue;
         } else if (file->file_type() == kSorted &&
-                   (file->GetDiscardableRatio() >
+                   (/*file->GetDiscardableRatio() >
                         cf_options.high_level_blob_discardable_ratio ||
                     (static_cast<int>(file->file_level()) >=
-                         cf_options.num_levels - 2 &&
+                         cf_options.num_levels - 2 &&*/
                      file->GetDiscardableRatio() >
-                         cf_options.blob_file_discardable_ratio))) {
-          mark++;
+                         cf_options.blob_file_discardable_ratio)) {
+          if(file->file_state() != BlobFileMeta::FileState::kToGC)
+            mark++;
           file->FileStateTransit(BlobFileMeta::FileEvent::kNeedGC);
         }
         if (count_sorted_run && file->file_type() == kSorted) {

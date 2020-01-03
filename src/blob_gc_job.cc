@@ -320,16 +320,18 @@ Status BlobGCJob::DoRunGC() {
     }
 
     last_key_valid = true;
-    if(db_options_.sep_before_flush&&!builder_->cf_options_.level_merge){
+    if(db_options_.sep_before_flush&&!blob_gc_->titan_cf_options().level_merge){
       auto wb = WriteBatch();
       if (builder_->Add(gc_iter->key(), gc_iter->value(), &wb).ok()) {
         TitanStopWatch w(env_, metrics_.gc_update_lsm_micros);
         s = base_db_->Write(wo, &wb);
         // if(!s.ok()) return s;
+      } else {
+        std::cerr<<"write builder error! "<<std::endl;
       }
       continue;
     }
-
+    
     // Rewrite entry to new blob file
     if ((!blob_file_handle && !blob_file_builder) ||
         file_size >= blob_gc_->titan_cf_options().blob_file_target_size) {
@@ -361,7 +363,7 @@ Status BlobGCJob::DoRunGC() {
     // count written bytes for new blob record,
     // blob index's size is counted in `RewriteValidKeyToLSM`
     metrics_.bytes_written += blob_record.size();
-
+    file_size += blob_record.size();
     BlobIndex new_blob_index;
     new_blob_index.file_number = blob_file_handle->GetNumber();
     blob_file_builder->Add(blob_record, &new_blob_index.blob_handle);

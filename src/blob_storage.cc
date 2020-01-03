@@ -21,7 +21,7 @@ bool BlobStorage::ShouldGCLowLevel() {
       high_size += level_blob_size_[i].load();
     }
     // std::cerr<<"level size:"<<low_size<<" "<<high_size<<std::endl;
-    return high_size>low_size&&low_size>0&&high_size/low_size<=10;
+    return high_size>low_size&&low_size>0&&high_size>((uint64_t)100<<30)&&high_size/low_size<=10;
   }
 
 Status BlobStorage::Get(const ReadOptions &options, const BlobIndex &index,
@@ -167,7 +167,7 @@ void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta> &file) {
   if(file->file_type()==kSorted){
   level_blob_size_[file->file_level()].fetch_add(file->file_size());
   } else {
-    level_blob_size_[cf_options_.num_levels].fetch_sub(file->file_size());
+    level_blob_size_[cf_options_.num_levels].fetch_add(file->file_size());
   }
   if (db_options_.sep_before_flush) {
     building_files_.erase(file->file_number());
@@ -260,10 +260,14 @@ void BlobStorage::PrintFileStates() {
     std::vector<uint64_t> reach_without_mark(cf_options_.num_levels);
     uint64_t num_unsorted = 0;
     uint64_t discardable_unsorted = 0;
+    uint64_t discardable_reach_unsorted = 0;
     for (auto& file:files_){
       if(file.second->file_type()==kUnSorted){
         num_unsorted++;
         discardable_unsorted += file.second->discardable_size();
+        if(file.second->GetDiscardableRatio()>cf_options_.blob_file_discardable_ratio){
+          discardable_reach_unsorted += file.second->discardable_size();
+        }
         continue;
       }
       int level = file.second->file_level();
@@ -295,7 +299,7 @@ void BlobStorage::PrintFileStates() {
       std::cout<<"numBlobsolete files "<<numObsolete[i]<<"\nnum need merge files "<<numNeedMerge[i]<<"\nnum need gc files "<<numNeedGC[i]<<"\ndiscardable size of need gc "<<gc_discardable_size[i]<<"\ndiscardable size of need merge "<<merge_discardable_size[i]<<"\ndiscardable size of no mark "<<nomark_discardable_size[i]<<"."<<std::endl;
       std::cout<<"reach gc thresh but no mark files:"<<reach_without_mark[i]<<std::endl;
     }
-    std::cout<<"unsorted file "<<num_unsorted<<"\n discardable "<<discardable_unsorted<<std::endl;
+    std::cout<<"unsorted file "<<num_unsorted<<"\n discardable "<<discardable_unsorted<<"\n discardable that reach threshold "<<discardable_reach_unsorted<<std::endl;
     std::cout<<"num blob files"<<files_.size()<<", obsolete files in storage records:"<<obsolete_files_.size()<<std::endl;
   }
 

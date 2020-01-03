@@ -336,7 +336,7 @@ void ForegroundBuilder::handleRequest(int b) {
   // std::cerr<<"req"<<std::endl;
   while (true) {
     // std::cerr<<"get"<<std::endl;
-    auto reqs = requests_[b].GetBulk();
+    auto reqs = std::move(requests_[b].GetBulk());
     // std::cerr<<"got"<<std::endl;
     for (Request *req : reqs) {
       if (req == nullptr) return;
