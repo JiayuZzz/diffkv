@@ -149,7 +149,7 @@ class ForegroundBuilder {
         builder_(db_options.num_foreground_builders),
         finished_files_(db_options.num_foreground_builders),
         requests_(db_options.num_foreground_builders) {
-    env_options_.writable_file_max_buffer_size = 4096;
+    env_options_.writable_file_max_buffer_size = 128*1024;
   }
 
   ForegroundBuilder() = default;

@@ -171,11 +171,16 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
 TitanDBImpl::~TitanDBImpl() {
   DumpStats();
   for (auto& builder : builders_) {
+    std::cerr<<"flush"<<std::endl;
     builder.second.Flush();
+    std::cerr<<"finish"<<std::endl;
     builder.second.Finish();
   }
+  std::cerr<<"purge"<<std::endl;
   PurgeObsoleteFiles();
+  std::cerr<<"close"<<std::endl;
   Close();
+  std::cerr<<"done"<<std::endl;
 }
 
 void TitanDBImpl::StartBackgroundTasks() {
