@@ -286,6 +286,7 @@ class TitanDBImpl : public TitanDB {
   int drop_cf_requests_ = 0;
 
   std::atomic_bool shuting_down_{false};
+  std::string size_file_{"/home/wujy/workspace/YCSB-C/resultDir/sizefiles/sizefile"+std::to_string(time(nullptr))};
 };
 
 }  // namespace titandb

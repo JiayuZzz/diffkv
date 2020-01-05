@@ -290,7 +290,6 @@ Status BlobGCJob::DoRunGC() {
   gc_iter->SeekToFirst();
   assert(gc_iter->Valid());
   for (; gc_iter->Valid(); gc_iter->Next()) {
-    TitanStopWatch sw(env_, metrics_.gc_write_blob_micros);
     if (IsShutingDown()) {
       s = Status::ShutdownInProgress();
       break;
@@ -321,8 +320,13 @@ Status BlobGCJob::DoRunGC() {
 
     last_key_valid = true;
     if(db_options_.sep_before_flush&&!blob_gc_->titan_cf_options().level_merge){
+      Status add_status;
       auto wb = WriteBatch();
-      if (builder_->Add(gc_iter->key(), gc_iter->value(), &wb).ok()) {
+      {
+        TitanStopWatch w(env_, metrics_.gc_write_blob_micros);
+        add_status = builder_->Add(gc_iter->key(), gc_iter->value(), &wb);
+      }
+      if (add_status.ok()) {
         TitanStopWatch w(env_, metrics_.gc_update_lsm_micros);
         s = base_db_->Write(wo, &wb);
         // if(!s.ok()) return s;
@@ -331,6 +335,7 @@ Status BlobGCJob::DoRunGC() {
       }
       continue;
     }
+    TitanStopWatch w(env_, metrics_.gc_write_blob_micros);
     
     // Rewrite entry to new blob file
     if ((!blob_file_handle && !blob_file_builder) ||
@@ -498,6 +503,7 @@ Status BlobGCJob::Finish() {
 }
 
 Status BlobGCJob::InstallOutputBlobFiles() {
+  TitanStopWatch w(env_, metrics_.gc_write_blob_micros);
   Status s;
   for (auto& builder : blob_file_builders_) {
     s = builder.second->Finish();

@@ -41,7 +41,7 @@ std::atomic<uint64_t> gc_mark_file{0};
 namespace rocksdb {
 namespace titandb {
 
-ThreadPool* TitanDBIterator::pool_ = new ThreadPool(32);
+// ThreadPool* TitanDBIterator::pool_ = new ThreadPool(32);
 
 class TitanDBImpl::FileManager : public BlobFileManager {
  public:
