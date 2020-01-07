@@ -35,6 +35,8 @@ extern std::atomic<uint64_t> foreground_blob_add_time;
 extern std::atomic<uint64_t> foreground_blob_finish_time;
 extern std::atomic<uint64_t> compute_gc_score;
 extern std::atomic<uint64_t> gc_write_blob;
+extern std::atomic<uint64_t> waitflush;
+
 std::atomic<uint64_t> range_merge_file{0};
 std::atomic<uint64_t> gc_mark_file{0};
 
@@ -170,15 +172,6 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
 
 TitanDBImpl::~TitanDBImpl() {
   DumpStats();
-  for (auto& builder : builders_) {
-    std::cerr<<"flush"<<std::endl;
-    builder.second.Flush();
-    std::cerr<<"finish"<<std::endl;
-    builder.second.Finish();
-  }
-  std::cerr<<"purge"<<std::endl;
-  PurgeObsoleteFiles();
-  std::cerr<<"close"<<std::endl;
   Close();
   std::cerr<<"done"<<std::endl;
 }
@@ -333,23 +326,30 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
 
 Status TitanDBImpl::Close() {
   Status s;
+  std::cerr<<"close impl\n";
   CloseImpl();
   if (db_) {
-    s = db_->Close();
-    delete db_;
+    std::cerr<<"close db_\n";
+    // s = db_->Close();
+    std::cerr<<"close db_ done\n";
+    // delete db_;
     db_ = nullptr;
     db_impl_ = nullptr;
   }
   if (lock_) {
+    std::cerr<<"unlock file\n";
     env_->UnlockFile(lock_);
     lock_ = nullptr;
   }
+  std::cerr<<"close done\n";
   return s;
 }
 
 Status TitanDBImpl::CloseImpl() {
   {
+    std::cerr<<"lock in close impl"<<std::endl;
     MutexLock l(&mutex_);
+    std::cerr<<"got lock"<<std::endl;
     // Although `shuting_down_` is atomic bool object, we should set it under
     // the protection of mutex_, otherwise, there maybe something wrong with it,
     // like:
@@ -365,9 +365,19 @@ Status TitanDBImpl::CloseImpl() {
     MutexLock l(&mutex_);
     bg_gc_scheduled_ -= gc_unscheduled;
     while (bg_gc_scheduled_ > 0) {
+      std::cerr<<"wait gc\n";
       bg_cv_.Wait();
+      std::cerr<<"wait gc end\n";
     }
   }
+
+  for (auto& builder : builders_) {
+    std::cerr<<"flush"<<std::endl;
+    builder.second.Flush();
+    std::cerr<<"finish"<<std::endl;
+    builder.second.Finish();
+  }
+  PurgeObsoleteFiles();
 
   if (thread_purge_obsolete_ != nullptr) {
     thread_purge_obsolete_->cancel();
@@ -1076,6 +1086,7 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
   std::cout << "blob add time: " << blob_add_time / 1000000.0 << std::endl;
   std::cout << "blob finish time; " << blob_finish_time / 1000000.0
             << std::endl;
+  std::cout << "foreground builder wait flush: " << waitflush / 1000000.0 << std::endl;
   std::cout << "foreground blob add time; "
             << foreground_blob_add_time / 1000000.0 << std::endl;
   std::cout << "foreground blob finish time: "

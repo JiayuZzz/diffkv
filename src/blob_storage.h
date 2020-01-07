@@ -8,6 +8,7 @@
 #include "blob_gc.h"
 #include "rocksdb/options.h"
 #include "titan_stats.h"
+#include "mutex"
 
 namespace rocksdb {
 namespace titandb {
@@ -52,7 +53,7 @@ class BlobStorage {
   const TitanCFOptions& cf_options() { return cf_options_; }
 
   const std::vector<GCScore> gc_score() {
-    MutexLock l(&mutex_);
+    std::unique_lock<std::mutex> l(mutex_);
     return gc_score_;
   }
 
@@ -81,7 +82,7 @@ class BlobStorage {
 
   // Marks all the blob files so that they can be picked by GC job.
   void MarkAllFilesForGC() {
-    MutexLock l(&mutex_);
+    std::unique_lock<std::mutex> l(mutex_);
     for (auto& file : files_) {
       file.second->set_gc_mark(true);
       file.second->FileStateTransit(BlobFileMeta::FileEvent::kDbRestart);
@@ -93,13 +94,13 @@ class BlobStorage {
   // The corresponding column family is dropped, so mark destroyed and we can
   // remove this blob storage later.
   void MarkDestroyed() {
-    MutexLock l(&mutex_);
+    std::unique_lock<std::mutex> l(mutex_);
     destroyed_ = true;
   }
 
   // Returns whether this blob storage can be deleted now.
   bool MaybeRemove() const {
-    MutexLock l(&mutex_);
+    std::unique_lock<std::mutex> l(mutex_);
     return destroyed_ && obsolete_files_.empty();
   }
 
@@ -124,14 +125,14 @@ class BlobStorage {
 
   // Returns the number of blob files, including obsolete files.
   std::size_t NumBlobFiles() const {
-    MutexLock l(&mutex_);
+    std::unique_lock<std::mutex> l(mutex_);
     return files_.size();
   }
 
   // Returns the number of obsolete blob files.
   // TODO: use this method to calculate `kNumObsoleteBlobFile` DB property.
   std::size_t NumObsoleteBlobFiles() const {
-    MutexLock l(&mutex_);
+    std::unique_lock<std::mutex> l(mutex_);
     return obsolete_files_.size();
   }
 
@@ -158,7 +159,8 @@ class BlobStorage {
   EnvOptions env_options_;
   uint32_t cf_id_;
 
-  mutable port::Mutex mutex_;
+  // mutable port::Mutex mutex_;
+  mutable std::mutex mutex_;
 
   // Only BlobStorage OWNS BlobFileMeta
   std::unordered_map<uint64_t, std::shared_ptr<BlobFileMeta>> files_;

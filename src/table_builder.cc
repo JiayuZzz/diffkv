@@ -16,6 +16,7 @@ std::atomic<uint64_t> blob_add_time{0};
 std::atomic<uint64_t> blob_finish_time{0};
 std::atomic<uint64_t> foreground_blob_add_time{0};
 std::atomic<uint64_t> foreground_blob_finish_time{0};
+std::atomic<uint64_t> waitflush{0};
 // rocksdb::Env* env_ = rocksdb::Env::Default();
 // extern rocksdb::Env* env_;
 
@@ -395,11 +396,13 @@ void ForegroundBuilder::handleRequest(int b) {
 }
 
 void ForegroundBuilder::Flush() {
+  uint64_t start = env_->NowMicros();
   for (int i = 0; i < num_builders_; i++) {
     auto req = Request("", "", nullptr);
     requests_[i].Put(&req);
     req.res.get_future().wait();
   }
+  waitflush += (env_->NowMicros() - start);
 }
 
 void ForegroundBuilder::Finish() {

@@ -89,7 +89,7 @@ Status BlobStorage::NewPrefetcher(uint64_t file_number,
 Status BlobStorage::GetBlobFilesInRanges(const RangePtr *ranges, size_t n,
                                          bool include_end,
                                          std::vector<uint64_t> *files) {
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
   for (size_t i = 0; i < n; i++) {
     const Slice *begin = ranges[i].start;
     const Slice *end = ranges[i].limit;
@@ -130,7 +130,7 @@ Status BlobStorage::GetBlobFilesInRanges(const RangePtr *ranges, size_t n,
 }
 
 std::weak_ptr<BlobFileMeta> BlobStorage::FindFile(uint64_t file_number) const {
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
   auto it = files_.find(file_number);
   if (it != files_.end()) {
     assert(file_number == it->second->file_number());
@@ -141,7 +141,7 @@ std::weak_ptr<BlobFileMeta> BlobStorage::FindFile(uint64_t file_number) const {
 
 std::weak_ptr<RandomAccessFileReader> BlobStorage::FindBuildingFile(
     uint64_t file_number) const {
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
   auto it = building_files_.find(file_number);
   if (it != building_files_.end()) {
     return it->second;
@@ -151,14 +151,14 @@ std::weak_ptr<RandomAccessFileReader> BlobStorage::FindBuildingFile(
 
 void BlobStorage::ExportBlobFiles(
     std::map<uint64_t, std::weak_ptr<BlobFileMeta>> &ret) const {
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
   for (auto &kv : files_) {
     ret.emplace(kv.first, std::weak_ptr<BlobFileMeta>(kv.second));
   }
 }
 
 void BlobStorage::AddBlobFile(std::shared_ptr<BlobFileMeta> &file) {
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
   files_.emplace(std::make_pair(file->file_number(), file));
   blob_ranges_.emplace(std::make_pair(Slice(file->smallest_key()), file));
   AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_FILE_SIZE,
@@ -187,14 +187,14 @@ Status BlobStorage::AddBuildingFile(uint64_t file_number) {
     }
     reader.reset(new RandomAccessFileReader(std::move(file), file_name));
   }
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
   building_files_.emplace(std::make_pair(file_number, reader));
   return s;
 }
 
 bool BlobStorage::MarkFileObsolete(uint64_t file_number,
                                    SequenceNumber obsolete_sequence) {
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
   auto file = files_.find(file_number);
   if (file == files_.end()) {
     return false;
@@ -205,7 +205,7 @@ bool BlobStorage::MarkFileObsolete(uint64_t file_number,
 
 void BlobStorage::MarkFileObsoleteLocked(std::shared_ptr<BlobFileMeta> file,
                                          SequenceNumber obsolete_sequence) {
-  mutex_.AssertHeld();
+  // mutex_.AssertHeld();
 
   obsolete_files_.push_back(
       std::make_pair(file->file_number(), obsolete_sequence));
@@ -226,7 +226,7 @@ void BlobStorage::MarkFileObsoleteLocked(std::shared_ptr<BlobFileMeta> file,
 }
 
 bool BlobStorage::RemoveFile(uint64_t file_number) {
-  mutex_.AssertHeld();
+  // mutex_.AssertHeld();
 
   auto file = files_.find(file_number);
   if (file == files_.end()) {
@@ -249,7 +249,7 @@ bool BlobStorage::RemoveFile(uint64_t file_number) {
 }
 
 void BlobStorage::PrintFileStates() {
-    MutexLock l(&mutex_);
+    std::unique_lock<std::mutex> l(mutex_);
     std::vector<int> numObsolete(cf_options_.num_levels);
     std::vector<int> numNeedMerge(cf_options_.num_levels);
     std::vector<int> numNeedGC(cf_options_.num_levels);
@@ -305,7 +305,7 @@ void BlobStorage::PrintFileStates() {
 
 void BlobStorage::GetObsoleteFiles(std::vector<std::string> *obsolete_files,
                                    SequenceNumber oldest_sequence) {
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
 
   uint32_t file_dropped = 0;
   uint64_t file_dropped_size = 0;
@@ -337,7 +337,7 @@ void BlobStorage::GetObsoleteFiles(std::vector<std::string> *obsolete_files,
 
 size_t BlobStorage::ComputeGCScore() {
   // TODO: no need to recompute all everytime
-  MutexLock l(&mutex_);
+  std::unique_lock<std::mutex> l(mutex_);
   uint64_t start = 0;
   {
     TitanStopWatch sw(env_, start);
