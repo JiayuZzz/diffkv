@@ -21,7 +21,7 @@ bool BlobStorage::ShouldGCLowLevel() {
       high_size += level_blob_size_[i].load();
     }
     // std::cerr<<"level size:"<<low_size<<" "<<high_size<<std::endl;
-    return high_size>low_size&&low_size>0&&high_size>((uint64_t)100<<30)&&high_size/low_size<=10;
+    return high_size>low_size&&low_size>0&&(low_size+high_size)>((uint64_t)100<<30)&&(low_size+high_size)/low_size<=10;
   }
 
 Status BlobStorage::Get(const ReadOptions &options, const BlobIndex &index,

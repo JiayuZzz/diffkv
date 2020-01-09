@@ -137,3 +137,5 @@ if (WITH_TITAN_TOOLS)
   target_include_directories(titandb_bench PRIVATE ${gflags_INCLUDE_DIR})
   target_link_libraries(titandb_bench ${TOOLS_LIBS})
 endif()
+
+add_definitions("-g")

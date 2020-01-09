@@ -34,6 +34,8 @@ class TitanTableBuilder : public TableBuilder {
         merge_level_(merge_level),
         start_level_(start_level) {
           merge_low_level_ = blob_storage_.lock()->ShouldGCLowLevel();
+          // std::cerr<<"start level"<<start_level_<<"merge level"<<merge_level_<<"target level"<<target_level_<<"merge_low_level"<<merge_level_<<".\n";
+
         }
 
   void Add(const Slice &key, const Slice &value) override;

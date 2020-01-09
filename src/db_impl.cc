@@ -327,14 +327,19 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
 Status TitanDBImpl::Close() {
   Status s;
   std::cerr<<"close impl\n";
+  PurgeObsoleteFiles();
   CloseImpl();
   if (db_) {
     std::cerr<<"close db_\n";
-    // s = db_->Close();
+    s = db_->Close();
     std::cerr<<"close db_ done\n";
-    // delete db_;
+    delete db_;
     db_ = nullptr;
     db_impl_ = nullptr;
+  }
+  for (auto& builder : builders_) {
+    std::cerr<<"finish"<<std::endl;
+    builder.second.Finish();
   }
   if (lock_) {
     std::cerr<<"unlock file\n";
@@ -370,14 +375,6 @@ Status TitanDBImpl::CloseImpl() {
       std::cerr<<"wait gc end\n";
     }
   }
-
-  for (auto& builder : builders_) {
-    std::cerr<<"flush"<<std::endl;
-    builder.second.Flush();
-    std::cerr<<"finish"<<std::endl;
-    builder.second.Finish();
-  }
-  PurgeObsoleteFiles();
 
   if (thread_purge_obsolete_ != nullptr) {
     thread_purge_obsolete_->cancel();
@@ -546,7 +543,7 @@ int TitanDBImpl::Scan(const ReadOptions& options, const std::string& start_key,
                       std::vector<std::string>& vals) {
   if ((int)keys.size() < len) keys.resize(len);
   if ((int)vals.size() < len) vals.resize(len);
-  auto iter = NewIterator(options);
+  auto iter = this->NewIterator(options);
   int ret = len;
   static_cast<TitanDBIterator*>(iter)->Scan(start_key, ret, keys, vals);
   delete iter;
@@ -955,7 +952,10 @@ void TitanDBImpl::MarkFileIfNeedMerge(
         end2.second ? end2.first->smallest_key() : end2.first->largest_key();
     int cmp = key1.compare(key2);
     // when the key being the same, order largest_key before smallest_key
-    return (cmp == 0) ? (!end1.second && end2.second) : (cmp < 0);
+    if(cmp==0) {
+      return end1.first == end2.first? end1.second : (!end1.second && end2.second);
+    }
+    return cmp < 0;
   };
   std::sort(blob_ends.begin(), blob_ends.end(), blob_ends_cmp);
 
@@ -971,16 +971,22 @@ void TitanDBImpl::MarkFileIfNeedMerge(
     } else {
       ++cur_remove;
       auto record = tmp.find(blob_ends[i].first);
+      if(record == tmp.end()){
+        std::cout<<"maybe bug in mark range merge\n";
+        continue;
+      }
       if (cur_add - record->second > max_sorted_runs &&
           record->first->file_state() != BlobFileMeta::FileState::kObsolete &&
           record->first->file_state() != BlobFileMeta::FileState::kToMerge &&
           record->first->file_state() != BlobFileMeta::FileState::kToGC) {
+        if(marked==0 && record->first->file_level()==0)
+        std::cerr<<"mark file level"<<record->first->file_level()<<std::endl;
         marked++;
         record->first->FileStateTransit(BlobFileMeta::FileEvent::kNeedMerge);
       }
     }
   }
-  range_merge_file += marked;
+  range_merge_file.fetch_add(marked);
 }
 
 Options TitanDBImpl::GetOptions(ColumnFamilyHandle* column_family) const {
@@ -1291,12 +1297,18 @@ void TitanDBImpl::OnCompactionCompleted(
     bool count_sorted_run =
         cf_options.level_merge && cf_options.range_merge &&
         cf_options.num_levels - 1 == compaction_job_info.output_level;
+        /*
+    if(count_sorted_run){
+    std::cerr<<"num levels "<<cf_options.num_levels<<" output level "<<compaction_job_info.output_level<<" input level "<<compaction_job_info.base_input_level<<std::endl;
+    if(cf_options.num_levels - 1 == compaction_job_info.output_level) std::cerr<<compaction_job_info.output_level<<" is "<<cf_options.num_levels - 1<<std::endl;
+    else std::cerr<<"no"<<std::endl;
+    }*/
     for (const auto& bfs : blob_files_size_diff) {
       // blob file size < 0 means discardable size > 0
       if (bfs.second >= 0) {
         if (count_sorted_run) {
           auto file = bs->FindFile(bfs.first).lock();
-          if (file != nullptr && file->file_type() == kSorted) {
+          if (file != nullptr && file->file_type() == kSorted && (int)file->file_level()==cf_options.num_levels-1) {
             files.emplace_back(std::move(file));
           }
         }
@@ -1338,7 +1350,7 @@ void TitanDBImpl::OnCompactionCompleted(
             mark++;
           file->FileStateTransit(BlobFileMeta::FileEvent::kNeedGC);
         }
-        if (count_sorted_run && file->file_type() == kSorted) {
+        if (count_sorted_run && file->file_type() == kSorted && (int)file->file_level()==cf_options.num_levels-1) {
           files.emplace_back(std::move(file));
         }
       }
@@ -1351,7 +1363,7 @@ void TitanDBImpl::OnCompactionCompleted(
       blob_file_set_->LogAndApply(edit);
       MarkFileIfNeedMerge(files, cf_options.max_sorted_runs);
     }
-    if ((!cf_options.level_merge&&bytes_written.load()>((uint64_t)130<<30)) || (cf_options.level_merge&&db_options_.sep_before_flush)) {
+    if ((!cf_options.level_merge&&bytes_written.load()>((uint64_t)15<<30)) || (cf_options.level_merge&&db_options_.sep_before_flush)) {
       if (bs->ComputeGCScore() >
           cf_options.min_gc_batch_size / cf_options.blob_file_target_size) {
         AddToGCQueue(compaction_job_info.cf_id);
