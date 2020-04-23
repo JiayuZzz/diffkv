@@ -625,6 +625,7 @@ Status BlobGCJob::DeleteInputBlobFiles() {
     metrics_.gc_num_files++;
     RecordInHistogram(stats_, TitanStats::GC_INPUT_FILE_SIZE,
                       file->file_size());
+    // std::cerr<<"delete "<<file->file_size()<<std::endl;
     edit.DeleteBlobFile(file->file_number(), obsolete_sequence);
   }
   s = blob_file_set_->LogAndApply(edit);

@@ -248,6 +248,80 @@ bool BlobStorage::RemoveFile(uint64_t file_number) {
   return true;
 }
 
+
+
+std::vector<int> CountSortedRun(std::vector<std::shared_ptr<BlobFileMeta>>& files) {
+  auto cmp = [](std::shared_ptr<BlobFileMeta>& f1, std::shared_ptr<BlobFileMeta>& f2){
+    return f1->smallest_key()<f2->smallest_key();
+  };
+  std::sort(files.begin(), files.end(), cmp);
+  std::vector<std::vector<BlobFileMeta*>> ss;
+  for(auto& f:files){
+    bool success = false;
+    for(auto& s:ss){
+      if(f->smallest_key()>s.back()->largest_key()){
+        s.push_back(f.get());
+        success = true;
+        break;
+      }
+    }
+    if(!success){
+      ss.push_back(std::vector<BlobFileMeta*>());
+      ss.back().push_back(f.get());
+    }
+  }
+  std::vector<int> res;
+  for(auto& s:ss) res.push_back(s.size());
+  return res;
+  /*
+  if (files.empty()) return 0;
+  // store and sort both ends of blob files to count sorted runs
+  std::vector<std::pair<BlobFileMeta*, bool>> blob_ends;
+  for (const auto& file : files) {
+    blob_ends.emplace_back(std::make_pair(file.get(), true));
+    blob_ends.emplace_back(std::make_pair(file.get(), false));
+  }
+  auto blob_ends_cmp = [](const std::pair<BlobFileMeta*, bool>& end1,
+                          const std::pair<BlobFileMeta*, bool>& end2) {
+    const std::string& key1 =
+        end1.second ? end1.first->smallest_key() : end1.first->largest_key();
+    const std::string& key2 =
+        end2.second ? end2.first->smallest_key() : end2.first->largest_key();
+    int cmp = key1.compare(key2);
+    // when the key being the same, order largest_key before smallest_key
+    if(cmp==0) {
+      return end1.first == end2.first? end1.second : (!end1.second && end2.second);
+    }
+    return cmp < 0;
+  };
+  std::sort(blob_ends.begin(), blob_ends.end(), blob_ends_cmp);
+
+  int cur_add = 0;
+  int cur_remove = 0;
+  int size = blob_ends.size();
+  int marked = 0;
+  int maxsr = 0;
+  std::unordered_map<BlobFileMeta*, int> tmp;
+  for (int i = 0; i < size; i++) {
+    if (blob_ends[i].second) {
+      ++cur_add;
+      tmp[blob_ends[i].first] = cur_remove;
+    } else {
+      ++cur_remove;
+      auto record = tmp.find(blob_ends[i].first);
+      if(record == tmp.end()){
+        std::cout<<"maybe bug in mark range merge\n";
+        continue;
+      }
+      if (cur_add - record->second > maxsr) {
+        maxsr = cur_add - record->second;
+      }
+    }
+  }
+  return maxsr;
+  */
+}
+
 void BlobStorage::PrintFileStates() {
     std::unique_lock<std::mutex> l(mutex_);
     std::vector<int> numObsolete(cf_options_.num_levels);
@@ -261,6 +335,7 @@ void BlobStorage::PrintFileStates() {
     uint64_t num_unsorted = 0;
     uint64_t discardable_unsorted = 0;
     uint64_t discardable_reach_unsorted = 0;
+    std::vector<std::vector<std::shared_ptr<BlobFileMeta>>> files(cf_options_.num_levels);
     for (auto& file:files_){
       if(file.second->file_type()==kUnSorted){
         num_unsorted++;
@@ -271,6 +346,7 @@ void BlobStorage::PrintFileStates() {
         continue;
       }
       int level = file.second->file_level();
+      files[level].push_back(file.second);
       numFile[level]++;
       switch (file.second->file_state())
       {
@@ -296,6 +372,13 @@ void BlobStorage::PrintFileStates() {
     std::cout<<"gc and merge status"<<std::endl;
     for(int i=0;i<cf_options_.num_levels;i++){
       std::cout<<"level "<<i<<" has "<<numFile[i]<<" files"<<std::endl;
+      auto sr = CountSortedRun(files[i]);
+      std::cout<<"level "<<i<<" has "<<sr.size()<<" sorted runs, each of sr cotains"<<"[";
+      for(int c:sr){
+        std::cout<<c<<", ";
+      }
+      
+      std::cout<<"] blob files"<<std::endl;
       std::cout<<"numBlobsolete files "<<numObsolete[i]<<"\nnum need merge files "<<numNeedMerge[i]<<"\nnum need gc files "<<numNeedGC[i]<<"\ndiscardable size of need gc "<<gc_discardable_size[i]<<"\ndiscardable size of need merge "<<merge_discardable_size[i]<<"\ndiscardable size of no mark "<<nomark_discardable_size[i]<<"."<<std::endl;
       std::cout<<"reach gc thresh but no mark files:"<<reach_without_mark[i]<<std::endl;
     }
