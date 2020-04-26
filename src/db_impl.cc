@@ -159,7 +159,8 @@ TitanDBImpl::TitanDBImpl(const TitanDBOptions& options,
       dbname_(dbname),
       env_(options.env),
       env_options_(options),
-      db_options_(options) {
+      db_options_(options),
+      size_cv_(&size_mutex_) {
   if (db_options_.dirname.empty()) {
     db_options_.dirname = dbname_ + "/titandb";
   }
@@ -293,7 +294,7 @@ Status TitanDBImpl::Open(const std::vector<TitanCFDescriptor>& descs,
       builders_.emplace(
           cf.first, ForegroundBuilder(cf.first, blob_manager_,
                                       blob_file_set_->GetBlobStorage(cf.first),
-                                      db_options_, cf.second));
+                                      db_options_, cf.second, stats_.get()));
       builders_[cf.first].Init();
     }
   }
@@ -354,6 +355,7 @@ Status TitanDBImpl::CloseImpl() {
   {
     std::cerr<<"lock in close impl"<<std::endl;
     MutexLock l(&mutex_);
+    MutexLock l1(&size_mutex_);
     std::cerr<<"got lock"<<std::endl;
     // Although `shuting_down_` is atomic bool object, we should set it under
     // the protection of mutex_, otherwise, there maybe something wrong with it,
@@ -363,6 +365,8 @@ Status TitanDBImpl::CloseImpl() {
     // 3, B thread: unschedule all bg work
     // 4, A thread: schedule bg work
     shuting_down_.store(true, std::memory_order_release);
+    block_for_size_.store(false);
+    size_cv_.SignalAll();
   }
 
   int gc_unscheduled = env_->UnSchedule(this, Env::Priority::USER);
@@ -555,6 +559,21 @@ Status TitanDBImpl::Put(const rocksdb::WriteOptions& options,
                         const rocksdb::Slice& key,
                         const rocksdb::Slice& value) {
   if (HasBGError()) return GetBGError();
+  // std::cerr<<"block write size is "<<db_options_.block_write_size<<".\n";
+  while (db_options_.block_write_size>0 && block_for_size_.load()){
+    std::cerr<<"blocked by size_cv\n";
+      {
+        uint32_t cf_id = column_family->GetID();
+        auto bs = blob_file_set_->GetBlobStorage(cf_id).lock();
+        bs->ComputeGCScore();
+        AddToGCQueue(cf_id);
+        MaybeScheduleGC();
+      }
+    MutexLock l(&size_mutex_);
+    size_cv_.Wait();
+    std::cerr<<"wait done\n";
+    // size_mutex_.Unlock();
+  }
   // if (db_options_.sep_before_flush && value.size() >
   // cf_info_[column_family->GetID()].immutable_cf_options.mid_blob_size) {
   if (db_options_.sep_before_flush) {
@@ -1177,6 +1196,7 @@ void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
       assert(false);
       return;
     }
+    uint64_t delta = 0;
     for (const auto& f : blob_files_size) {
       auto file = blob_storage->FindFile(f.first).lock();
       // This file maybe output of a gc job, and it's been GCed out.
@@ -1186,12 +1206,18 @@ void TitanDBImpl::OnFlushCompleted(const FlushJobInfo& flush_job_info) {
       ROCKS_LOG_INFO(db_options_.info_log,
                      "OnFlushCompleted[%d]: output blob file %" PRIu64 ".",
                      flush_job_info.job_id, file->file_number());
+      uint64_t discardable = 0;
+
       if (file->discardable_size() == 0) {
-        file->AddDiscardableSize(file->file_size() - f.second -
-                                 kBlobHeaderSize - kBlobFooterSize);
+        discardable = file->file_size() - f.second -
+                                 kBlobHeaderSize - kBlobFooterSize;
       } else {
-        file->AddDiscardableSize(-f.second);
+        discardable = -f.second;
       }
+      delta += discardable;
+      SubStats(stats_.get(), flush_job_info.cf_id, TitanInternalStats::LIVE_BLOB_SIZE, delta);
+
+      file->AddDiscardableSize(discardable);
       if (file->file_type() == kSorted) assert(file->discardable_size() == 0);
       file->FileStateTransit(BlobFileMeta::FileEvent::kFlushCompleted);
     }
@@ -1366,7 +1392,22 @@ void TitanDBImpl::OnCompactionCompleted(
       blob_file_set_->LogAndApply(edit);
       MarkFileIfNeedMerge(files, cf_options.max_sorted_runs);
     }
-    if ((!cf_options.level_merge&&bytes_written.load()>((uint64_t)130<<30)) || (cf_options.level_merge&&db_options_.sep_before_flush)) {
+
+    uint64_t live_size = 0;
+    uint64_t total_size = 0;
+    GetIntProperty("rocksdb.titandb.live-blob-size",&live_size);
+    GetIntProperty("rocksdb.titandb.live-blob-file-size",&total_size);
+    bool bg_gc = total_size>live_size && (double)(total_size-live_size)/total_size > cf_options.blob_file_discardable_ratio;
+    if(db_options_.block_write_size>0){
+    if(total_size>db_options_.block_write_size) {
+      block_for_size_.store(true);
+    } else if(block_for_size_.load()){
+      block_for_size_.store(false);
+      size_cv_.SignalAll();
+    }
+    }
+
+    if ((!cf_options.level_merge&&bg_gc) || (cf_options.level_merge&&db_options_.sep_before_flush)) {
       if (bs->ComputeGCScore() >
           cf_options.min_gc_batch_size / cf_options.blob_file_target_size) {
         AddToGCQueue(compaction_job_info.cf_id);

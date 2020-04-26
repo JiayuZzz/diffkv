@@ -128,6 +128,15 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
         s = blob_gc_job.Finish();
       }
       blob_gc->ReleaseGcFiles();
+      {
+      uint64_t total_size = 0;
+      GetIntProperty("rocksdb.titandb.live-blob-file-size",&total_size);
+      if(block_for_size_.load()&&total_size<db_options_.block_write_size){
+        block_for_size_.store(false);
+      }
+      MutexLock l(&size_mutex_);
+      size_cv_.SignalAll();
+      }
 
       if (blob_gc->trigger_next() &&
           (bg_gc_scheduled_ - 1 + gc_queue_.size() <

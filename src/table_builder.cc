@@ -380,6 +380,8 @@ void ForegroundBuilder::handleRequest(int b) {
         BlobIndex blob_index;
         blob_index.file_number = handle_[b]->GetNumber();
         builder_[b]->Add(blob_record, &blob_index.blob_handle);
+        AddStats(stats_, cf_id_, TitanInternalStats::LIVE_BLOB_SIZE, req->val.size());
+
         if (handle_[b]->GetFile()->GetFileSize() >=
             cf_options_.blob_file_target_size) {
           FinishBlob(b);

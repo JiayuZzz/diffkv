@@ -287,6 +287,9 @@ class TitanDBImpl : public TitanDB {
 
   std::atomic_bool shuting_down_{false};
   std::string size_file_{"/home/kvgroup/wujiayu/YCSB-C/resultDir/sizefiles/sizefile"+std::to_string(time(nullptr))};
+  std::atomic<bool> block_for_size_{false};
+  port::CondVar size_cv_;
+  mutable port::Mutex size_mutex_;
 };
 
 }  // namespace titandb

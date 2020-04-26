@@ -139,7 +139,8 @@ class ForegroundBuilder {
                     std::shared_ptr<BlobFileManager> blob_file_manager,
                     std::weak_ptr<BlobStorage> blob_storage,
                     const TitanDBOptions &db_options,
-                    const TitanCFOptions &cf_options)
+                    const TitanCFOptions &cf_options,
+                    TitanStats *stats)
       : num_builders_(db_options.num_foreground_builders),
         cf_id_(cf_id),
         blob_file_manager_(blob_file_manager),
@@ -150,7 +151,8 @@ class ForegroundBuilder {
         handle_(db_options.num_foreground_builders),
         builder_(db_options.num_foreground_builders),
         finished_files_(db_options.num_foreground_builders),
-        requests_(db_options.num_foreground_builders) {
+        requests_(db_options.num_foreground_builders),
+        stats_(stats) {
     env_options_.writable_file_max_buffer_size = 4*1024;
   }
 
@@ -172,6 +174,7 @@ class ForegroundBuilder {
   std::hash<std::string> hash{};
   std::vector<BlockQueue<Request *>> requests_;
   std::vector<std::thread> pool_{};
+  TitanStats *stats_;
 
   void handleRequest(int i);
 
