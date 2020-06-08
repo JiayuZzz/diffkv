@@ -34,7 +34,7 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
     // std::cerr<<"break"<<std::endl;
     // break;
     // }
-    assert(gc_score.score >= cf_options_.blob_file_discardable_ratio);
+    // assert(gc_score.score >= cf_options_.blob_file_discardable_ratio);
     auto blob_file = blob_storage->FindFile(gc_score.file_number).lock();
     if (!CheckBlobFile(blob_file.get()) ||
         (cf_options_.level_merge && blob_file->file_type() == kSorted)) {
@@ -50,7 +50,7 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
       continue;
     }
     if (!stop_picking) {
-      if (gc_score.score == 0) continue;
+      // if (gc_score.score == 0) continue;
       blob_files.push_back(blob_file.get());
       batch_size += blob_file->file_size();
       // std::cerr<<"batch size add "<<blob_file->file_size()<<"
@@ -89,9 +89,9 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
   // if there is only one small file to merge, no need to perform
   if (blob_files.size() == 1 &&
       blob_files[0]->file_size() <= cf_options_.merge_small_file_threshold &&
-      blob_files[0]->gc_mark() == false &&
+      blob_files[0]->gc_mark() == false /*&&
       blob_files[0]->GetDiscardableRatio() <
-          cf_options_.blob_file_discardable_ratio) {
+          cf_options_.blob_file_discardable_ratio*/) {
     return nullptr;
   }
   // std::cerr<<"return "<<blob_files.size()<<"blob to gc"<<std::endl;
