@@ -285,8 +285,8 @@ Status BlobGCJob::DoRunGC() {
 
   uint64_t file_size = 0;
 
-  std::string last_key;
-  bool last_key_valid = false;
+  // std::string last_key;
+  // bool last_key_valid = false;
   gc_iter->SeekToFirst();
   assert(gc_iter->Valid());
   for (; gc_iter->Valid(); gc_iter->Next()) {
@@ -297,7 +297,7 @@ Status BlobGCJob::DoRunGC() {
     BlobIndex blob_index = gc_iter->GetBlobIndex();
     // count read bytes for blob record of gc candidate files
     metrics_.bytes_read += blob_index.blob_handle.size;
-
+/*
     if (!last_key.empty() && !gc_iter->key().compare(last_key)) {
       if (last_key_valid) {
         continue;
@@ -306,7 +306,7 @@ Status BlobGCJob::DoRunGC() {
       last_key = gc_iter->key().ToString();
       last_key_valid = false;
     }
-
+*/
     bool discardable = false;
     s = DiscardEntry(gc_iter->key(), blob_index, &discardable);
     if (!s.ok()) {
@@ -318,7 +318,7 @@ Status BlobGCJob::DoRunGC() {
       continue;
     }
 
-    last_key_valid = true;
+    // last_key_valid = true;
     if(db_options_.sep_before_flush&&!blob_gc_->titan_cf_options().level_merge){
       Status add_status;
       auto wb = WriteBatch();

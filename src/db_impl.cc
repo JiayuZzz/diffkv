@@ -1099,8 +1099,11 @@ TitanDBOptions TitanDBImpl::GetTitanDBOptions() const {
 
 bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
                               const Slice& property, std::string* value) {
+  std::cout << "## write size ##\n";
   std::cout << "blob builder written bytes: " << bytes_written / 1000000.0
             << std::endl;
+
+  std::cout << "\n## unsorted blob file gc ##\n";
   std::cout << "gc update lsm time: " << gc_update_lsm / 1000000.0 << std::endl;
   std::cout << "gc read lsm time: " << gc_read_lsm / 1000000.0 << std::endl;
   std::cout << "gc sample time: " << gc_sample / 1000000.0 << std::endl;
@@ -1108,18 +1111,26 @@ bool TitanDBImpl::GetProperty(ColumnFamilyHandle* column_family,
   std::cout << "total gc time: " << gc_total / 1000000.0 << std::endl;
   std::cout << "compute gc score time: " << compute_gc_score / 1000000.0
             << std::endl;
+
+  std::cout << "\n## sorted blob file merge ##\n";
   std::cout << "blob merge time: " << blob_merge_time / 1000000.0 << std::endl;
   std::cout << "blob read time: " << blob_read_time / 1000000.0 << std::endl;
   std::cout << "blob add time: " << blob_add_time / 1000000.0 << std::endl;
   std::cout << "blob finish time; " << blob_finish_time / 1000000.0
             << std::endl;
-  std::cout << "foreground builder wait flush: " << waitflush / 1000000.0 << std::endl;
-  std::cout << "foreground blob add time; "
-            << foreground_blob_add_time / 1000000.0 << std::endl;
-  std::cout << "foreground blob finish time: "
-            << foreground_blob_finish_time / 1000000.0 << std::endl;
+
+  std::cout << "\n ## marked files ##\n";
   std::cout << "range merge marked file: " << range_merge_file << std::endl;
   std::cout << "gc marked file: " << gc_mark_file << std::endl;
+
+  std::cout << "\n## unsorted blob file build ##\n";
+  std::cout << "builder wait flush: " << waitflush / 1000000.0 << std::endl;
+  std::cout << "blob add time; "
+            << foreground_blob_add_time / 1000000.0 << std::endl;
+  std::cout << "blob finish time: "
+            << foreground_blob_finish_time / 1000000.0 << std::endl;
+
+  std::cout << "\n## blob file states in each level ##\n";
   blob_file_set_->PrintFileStates();
   assert(column_family != nullptr);
   bool s = false;
@@ -1393,11 +1404,12 @@ void TitanDBImpl::OnCompactionCompleted(
       MarkFileIfNeedMerge(files, cf_options.max_sorted_runs);
     }
 
+    // calculate total invalid ratio of blob files
     uint64_t live_size = 0;
     uint64_t total_size = 0;
     GetIntProperty("rocksdb.titandb.live-blob-size",&live_size);
     GetIntProperty("rocksdb.titandb.live-blob-file-size",&total_size);
-    bool bg_gc = total_size>live_size && (double)(total_size-live_size)/total_size > cf_options.blob_file_discardable_ratio;
+    bool bg_gc = total_size>live_size && (double)(total_size-live_size)/total_size > cf_options.blob_file_discardable_ratio; // trigger wisckey gc?
     if(db_options_.block_write_size>0){
     if(total_size>db_options_.block_write_size) {
       block_for_size_.store(true);

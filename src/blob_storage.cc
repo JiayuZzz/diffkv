@@ -369,21 +369,23 @@ void BlobStorage::PrintFileStates() {
         break;
       }
     }
-    std::cout<<"gc and merge status"<<std::endl;
+    std::cout<<"~~~~~ overall ~~~~~\n";
+    std::cout<<"num blob files"<<files_.size()<<", obsolete files in storage records:"<<obsolete_files_.size()<<std::endl;
     for(int i=0;i<cf_options_.num_levels;i++){
+      std::cout << "~~~~~ level "<<i<<" ~~~~~~\n";
       std::cout<<"level "<<i<<" has "<<numFile[i]<<" files"<<std::endl;
       auto sr = CountSortedRun(files[i]);
-      std::cout<<"level "<<i<<" has "<<sr.size()<<" sorted runs, each of sr cotains"<<"[";
+      std::cout<<"level "<<i<<" has "<<sr.size()<<" sorted runs, each of them cotains"<<"[";
       for(int c:sr){
         std::cout<<c<<", ";
       }
       
       std::cout<<"] blob files"<<std::endl;
-      std::cout<<"numBlobsolete files "<<numObsolete[i]<<"\nnum need merge files "<<numNeedMerge[i]<<"\nnum need gc files "<<numNeedGC[i]<<"\ndiscardable size of need gc "<<gc_discardable_size[i]<<"\ndiscardable size of need merge "<<merge_discardable_size[i]<<"\ndiscardable size of no mark "<<nomark_discardable_size[i]<<"."<<std::endl;
-      std::cout<<"reach gc thresh but no mark files:"<<reach_without_mark[i]<<std::endl;
+      std::cout<<"numBlobsolete files: "<<numObsolete[i]<<"\nnum need merge files: "<<numNeedMerge[i]<<"\nnum need gc files: "<<numNeedGC[i]<<"\ndiscardable size of need gc: "<<gc_discardable_size[i]<<"\ndiscardable size of need merge: "<<merge_discardable_size[i]<<"\ndiscardable size of no mark: "<<nomark_discardable_size[i]<<"."<<std::endl;
+      std::cout<<"reach gc thresh but no mark:"<<reach_without_mark[i]<<std::endl;
     }
-    std::cout<<"unsorted file "<<num_unsorted<<"\n discardable "<<discardable_unsorted<<"\n discardable that reach threshold "<<discardable_reach_unsorted<<std::endl;
-    std::cout<<"num blob files"<<files_.size()<<", obsolete files in storage records:"<<obsolete_files_.size()<<std::endl;
+    std::cout << "~~~~~ unsorted file ~~~~~~\n";
+    std::cout<<"discardable: "<<discardable_unsorted<<"\n discardable that reach threshold: "<<discardable_reach_unsorted<<std::endl;
   }
 
 void BlobStorage::GetObsoleteFiles(std::vector<std::string> *obsolete_files,
