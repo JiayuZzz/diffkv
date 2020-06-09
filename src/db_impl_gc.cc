@@ -138,9 +138,9 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
       size_cv_.SignalAll();
       }
 
-      if (blob_gc->trigger_next() &&
+      if (block_for_size_.load() || (blob_gc->trigger_next() &&
           (bg_gc_scheduled_ - 1 + gc_queue_.size() <
-           2 * static_cast<uint32_t>(db_options_.max_background_gc))) {
+           2 * static_cast<uint32_t>(db_options_.max_background_gc)))) {
         // RecordTick(stats_.get(), TitanStats::GC_TRIGGER_NEXT, 1);
         // There is still data remained to be GCed
         // and the queue is not overwhelmed

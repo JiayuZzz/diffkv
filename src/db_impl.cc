@@ -1421,7 +1421,7 @@ void TitanDBImpl::OnCompactionCompleted(
 
     if ((!cf_options.level_merge&&bg_gc) || (cf_options.level_merge&&db_options_.sep_before_flush)) {
       if (bs->ComputeGCScore() >
-          cf_options.min_gc_batch_size / cf_options.blob_file_target_size) {
+          (1<<30) / cf_options.blob_file_target_size) {
         AddToGCQueue(compaction_job_info.cf_id);
         MaybeScheduleGC();
       }

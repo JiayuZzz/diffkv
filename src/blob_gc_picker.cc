@@ -79,11 +79,6 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
                   " bytes",
                   batch_size, estimate_output_size);
   if (blob_files.empty() || batch_size < cf_options_.min_gc_batch_size) {
-    // std::cerr<<"first gc
-    // score"<<blob_storage->gc_score().front().score<<"score"<<std::endl;
-    // if(batch_size<cf_options_.min_gc_batch_size) std::cerr<<"min
-    // batch"<<std::endl; if(blob_files.empty()) std::cerr<<"empty
-    // blob"<<std::endl;
     return nullptr;
   }
   // if there is only one small file to merge, no need to perform

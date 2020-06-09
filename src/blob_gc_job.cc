@@ -163,7 +163,11 @@ Status BlobGCJob::Run() {
 
 Status BlobGCJob::SampleCandidateFiles() {
   TitanStopWatch sw(env_, metrics_.gc_sampling_micros);
-  std::vector<BlobFileMeta*> result;
+  std::vector<BlobFileMeta*> result(blob_gc_->inputs());
+  
+  blob_gc_->set_sampled_inputs(std::move(result));
+  // No need to sample.
+  /*
   for (const auto& file : blob_gc_->inputs()) {
     bool selected = false;
     Status s = DoSample(file, &selected);
@@ -176,7 +180,7 @@ Status BlobGCJob::SampleCandidateFiles() {
   }
   if (!result.empty()) {
     blob_gc_->set_sampled_inputs(std::move(result));
-  }
+  } */
   return Status::OK();
 }
 
