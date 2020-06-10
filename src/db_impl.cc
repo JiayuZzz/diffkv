@@ -564,14 +564,16 @@ Status TitanDBImpl::Put(const rocksdb::WriteOptions& options,
     std::cerr<<"blocked by size_cv\n";
       {
         uint32_t cf_id = column_family->GetID();
-        auto bs = blob_file_set_->GetBlobStorage(cf_id).lock();
-        bs->ComputeGCScore();
+        // auto bs = blob_file_set_->GetBlobStorage(cf_id).lock();
+        // bs->ComputeGCScore();
         AddToGCQueue(cf_id);
         MaybeScheduleGC();
       }
     MutexLock l(&size_mutex_);
-    size_cv_.Wait();
-    std::cerr<<"wait done\n";
+    if(block_for_size_.load()){
+      size_cv_.Wait();
+      std::cerr<<"wait done\n";
+    }
     // size_mutex_.Unlock();
   }
   // if (db_options_.sep_before_flush && value.size() >
@@ -1421,7 +1423,7 @@ void TitanDBImpl::OnCompactionCompleted(
 
     if ((!cf_options.level_merge&&bg_gc) || (cf_options.level_merge&&db_options_.sep_before_flush)) {
       if (bs->ComputeGCScore() >
-          (1<<30) / cf_options.blob_file_target_size) {
+          (1<<30) / cf_options.blob_file_target_size || block_for_size_.load()) {
         AddToGCQueue(compaction_job_info.cf_id);
         MaybeScheduleGC();
       }
