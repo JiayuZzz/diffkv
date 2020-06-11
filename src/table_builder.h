@@ -106,6 +106,8 @@ class TitanTableBuilder : public TableBuilder {
   uint64_t io_bytes_written_ = 0;
 };
 
+
+// separete kv before memtable
 class ForegroundBuilder {
  public:
   friend class BlobGCJob;
