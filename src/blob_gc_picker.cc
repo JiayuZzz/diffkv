@@ -27,7 +27,9 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
   bool stop_picking = false;
   bool maybe_continue_next_time = false;
   uint64_t next_gc_size = 0;
+  int cnt = 0;
   for (auto& gc_score : blob_storage->gc_score()) {
+    cnt++;
     // if (gc_score.score < cf_options_.blob_file_discardable_ratio &&
     // cf_options_.level_merge &&
     // cf_options_.blob_file_discardable_ratio != 0.01) {
@@ -62,9 +64,12 @@ std::unique_ptr<BlobGC> BasicBlobGCPicker::PickBlobGC(
         stop_picking = true;
       }
     } else {
-      next_gc_size += blob_file->file_size();
-      if (next_gc_size > cf_options_.min_gc_batch_size) {
+      // next_gc_size += blob_file->file_size();
+      // if (next_gc_size > cf_options_.min_gc_batch_size) {
+        if (blob_storage->gc_score().size()-cnt>(1<<30)/blob_storage->cf_options().blob_file_target_size){
         maybe_continue_next_time = true;
+        
+
         // RecordTick(stats_, TitanStats::GC_REMAIN, 1);
         ROCKS_LOG_INFO(db_options_.info_log,
                        "remain more than %" PRIu64

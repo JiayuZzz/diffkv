@@ -14,6 +14,7 @@ std::atomic<uint64_t> gc_read_lsm{0};
 std::atomic<uint64_t> gc_write_value{0};
 std::atomic<uint64_t> gc_sample{0};
 std::atomic<uint64_t> gc_write_blob{0};
+std::atomic<uint64_t> gc_total{0};
 
 namespace rocksdb {
 namespace titandb {
@@ -129,6 +130,7 @@ Status BlobGCJob::Prepare() {
 }
 
 Status BlobGCJob::Run() {
+  TitanStopWatch sw(env_, metrics_.gc_total_micros);
   Status s = SampleCandidateFiles();
   if (!s.ok()) {
     return s;
@@ -475,6 +477,7 @@ Status BlobGCJob::Finish() {
 
   } else {
     mutex_->Unlock();
+    TitanStopWatch sw(env_, metrics_.gc_total_micros);
     s = InstallOutputBlobFiles();
     if (s.ok()) {
       s = RewriteValidKeyToLSM();
@@ -494,7 +497,7 @@ Status BlobGCJob::Finish() {
   }
 
   // TODO(@DorianZheng) cal discardable size for new blob file
-
+  TitanStopWatch sw(env_, metrics_.gc_total_micros);
   if (s.ok() && !blob_gc_->GetColumnFamilyData()->IsDropped()) {
     s = DeleteInputBlobFiles();
   }
@@ -679,6 +682,7 @@ void BlobGCJob::UpdateInternalOpStats() {
   gc_update_lsm += metrics_.gc_update_lsm_micros;
   gc_sample += metrics_.gc_sampling_micros;
   gc_write_blob += metrics_.gc_write_blob_micros;
+  gc_total+=metrics_.gc_total_micros;
 }
 
 }  // namespace titandb

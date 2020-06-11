@@ -8,7 +8,7 @@
 #include "blob_gc_job.h"
 #include "blob_gc_picker.h"
 
-std::atomic<uint64_t> gc_total{0};
+// std::atomic<uint64_t> gc_total{0};
 
 namespace rocksdb {
 namespace titandb {
@@ -83,7 +83,6 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
   std::unique_ptr<ColumnFamilyHandle> cfh;
   Status s;
   {
-    TitanStopWatch sw(env_, gc_time);
     std::shared_ptr<BlobStorage> blob_storage;
     // Skip CFs that have been dropped.
     if (!blob_file_set_->IsColumnFamilyObsolete(column_family_id)) {
@@ -121,30 +120,42 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
       if (s.ok()) {
         // std::cerr<<"run gc"<<std::endl;
         mutex_.Unlock();
+        {
+        TitanStopWatch sw(env_, gc_time);
         s = blob_gc_job.Run();
+        }
         mutex_.Lock();
       }
       if (s.ok()) {
+        TitanStopWatch sw(env_, gc_time);
         s = blob_gc_job.Finish();
       }
       blob_gc->ReleaseGcFiles();
-      {
+      
       uint64_t total_size = 0;
+      uint64_t live_size = 0;
       GetIntProperty("rocksdb.titandb.live-blob-file-size",&total_size);
+      GetIntProperty("rocksdb.titandb.live-blob-size",&live_size);
       if(block_for_size_.load()&&total_size<db_options_.block_write_size){
+        MutexLock l(&size_mutex_);
         block_for_size_.store(false);
-      }
-      MutexLock l(&size_mutex_);
-      size_cv_.SignalAll();
+        size_cv_.SignalAll();
       }
 
-      if (block_for_size_.load() || (blob_gc->trigger_next() &&
-          (bg_gc_scheduled_ - 1 + gc_queue_.size() <
-           2 * static_cast<uint32_t>(db_options_.max_background_gc)))) {
+      auto cf_options = blob_storage->cf_options();
+      bool wisc_gc = !cf_options.level_merge && total_size> (uint64_t) (100+100*cf_options.blob_file_discardable_ratio)<<30;
+      // bool wisc_gc = !cf_options.level_merge && total_size>live_size && (double)(total_size-live_size)/total_size > blob_storage->cf_options().blob_file_discardable_ratio;
+
+      bool bg_gc = (bg_gc_scheduled_ - 1 + gc_queue_.size() <
+           2 * static_cast<uint32_t>(db_options_.max_background_gc)) && (block_for_size_.load() || blob_gc->trigger_next());
+
+      if (bg_gc || wisc_gc) {
         // RecordTick(stats_.get(), TitanStats::GC_TRIGGER_NEXT, 1);
         // There is still data remained to be GCed
         // and the queue is not overwhelmed
         // then put this cf to GC queue for next GC
+        
+        // blob_storage->ComputeGCScore();
         AddToGCQueue(blob_gc->column_family_handle()->GetID());
       }
     }
@@ -161,7 +172,7 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
 
     TEST_SYNC_POINT("TitanDBImpl::BackgroundGC:Finish");
   }
-  gc_total += gc_time;
+  // gc_total += gc_time;
   return s;
 }
 
