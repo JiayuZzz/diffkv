@@ -140,7 +140,8 @@ Status TitanDBImpl::BackgroundGC(LogBuffer* log_buffer,
       }
 
       auto cf_options = blob_storage->cf_options();
-      bool wisc_gc = !cf_options.level_merge && total_size>live_size && (double)(total_size-live_size)/total_size > blob_storage->cf_options().blob_file_discardable_ratio;
+      bool wisc_gc = !cf_options.level_merge && total_size> (uint64_t) (100+100*cf_options.blob_file_discardable_ratio)<<30;
+      // bool wisc_gc = !cf_options.level_merge && total_size>live_size && (double)(total_size-live_size)/total_size > blob_storage->cf_options().blob_file_discardable_ratio;
 
       bool bg_gc = (bg_gc_scheduled_ - 1 + gc_queue_.size() <
            2 * static_cast<uint32_t>(db_options_.max_background_gc)) && (block_for_size_.load() || blob_gc->trigger_next());

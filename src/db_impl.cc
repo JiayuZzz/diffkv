@@ -1410,7 +1410,8 @@ void TitanDBImpl::OnCompactionCompleted(
     uint64_t total_size = 0;
     GetIntProperty("rocksdb.titandb.live-blob-size",&live_size);
     GetIntProperty("rocksdb.titandb.live-blob-file-size",&total_size);
-    bool bg_gc = total_size>live_size && (double)(total_size-live_size)/total_size > cf_options.blob_file_discardable_ratio; // trigger wisckey gc?
+    // bool bg_gc = total_size>live_size&& (double)(total_size-live_size)/total_size > cf_options.blob_file_discardable_ratio; // trigger wisckey gc?
+    bool wisc_gc = !cf_options.level_merge && total_size > (uint64_t) 130<<30;
     if(db_options_.block_write_size>0){
     if(total_size>db_options_.block_write_size) {
       block_for_size_.store(true);
@@ -1420,7 +1421,7 @@ void TitanDBImpl::OnCompactionCompleted(
     }
     }
 
-    if ((!cf_options.level_merge&&bg_gc) || (cf_options.level_merge&&db_options_.sep_before_flush)) {
+    if (wisc_gc || (cf_options.level_merge&&db_options_.sep_before_flush)) {
       if (bs->ComputeGCScore() >
           (1<<30) / cf_options.blob_file_target_size || block_for_size_.load()) {
         AddToGCQueue(compaction_job_info.cf_id);
